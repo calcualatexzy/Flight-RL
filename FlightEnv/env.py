@@ -95,6 +95,9 @@ class FlightEnv(gym.Env):
 
         self._hard_reset = hard_reset
 
+        # Set the goal horizon.
+        
+
     def reset(self):
         pybullet.configureDebugVisualizer(pybullet.COV_ENABLE_RENDERING, 0, physicsClientId=self.PYB_CLIENT)        
         if self._hard_reset:
@@ -130,6 +133,7 @@ class FlightEnv(gym.Env):
         """
         rpm = self._preprocess_action(action)
         self.quadrotor.step(rpm)
+        reward = self._get_reward()
 
     def render(self, mode="rgb_array", close=False):
         if mode != "rgb_array":
