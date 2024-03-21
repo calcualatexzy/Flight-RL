@@ -30,6 +30,9 @@ class FlightEnv(gym.Env):
     def __init__(self, render=False, mode="Hover",
                  verbose=False, 
                  hard_reset=True,
+                 reward_state_weight=1.0,
+                 reward_action_weight=0.0001,
+                 reward_exponential=False,
                  goal_horizon=0,
                  episode_len_sec=10,
                  freq = 50,
@@ -70,40 +73,40 @@ class FlightEnv(gym.Env):
         self._physics = Physics(physics)
         self.quadrotor.load_model_param()
 
+        # Set the goal horizon.
+        self._goal_horizon = goal_horizon
+        self._episode_len_sec = episode_len_sec
+
+        self._reward_state_weight = reward_state_weight
+        self._reward_action_weight = reward_action_weight
+        self._reward_exponential = reward_exponential
+
         # Action space: 4 motors thrusts 
         self.action_dim = 4
         action_low, action_high = self._set_action()
         self.action_bounds = np.array([action_low, action_high])
         self.action_space = gym.spaces.Box(low=action_low, high=action_high, dtype=np.float32)
 
-        # Observation space: 12 states = {x, x_dot, y, y_dot, z, z_dot, phi, theta, psi, p_body, q_body, r_body}        
+        # State space: 12 states (no goal horizon)
+        # Observation space: 12 states * horizon = {x, x_dot, y, y_dot, z, z_dot, phi, theta, psi, p_body, q_body, r_body}        
+        self.state_dim = 12
+        self._state = np.zeros(self.state_dim)
+        
         observation_low, observation_high = self._set_observation()
+        self._state_space_low = observation_low
+        self._state_space_high = observation_high
+
+        if self._goal_horizon > 0:
+            mul = 1 + self._goal_horizon
+            observation_low = np.concatenate([observation_low] * mul)
+            observation_high = np.concatenate([observation_high] * mul)
+
         self.observation_space = gym.spaces.Box(low=observation_low, high=observation_high, dtype=np.float32)
         self.observation_dim = self.observation_space.shape[0]
         self._observation = np.zeros(self.observation_dim)
         self._norm_observation = np.zeros(self.observation_dim)
 
         self._hard_reset = hard_reset
-
-        # Set the goal horizon.
-        self._goal_horizon = goal_horizon
-        self._episode_len_sec = episode_len_sec
-        pos_ref, vel_ref = self._generate_trajectory(self._episode_len_sec, self._time_step)
-        self.state_goal = np.vstack([
-            pos_ref[:, 0],
-            vel_ref[:, 0],
-            pos_ref[:, 1],
-            vel_ref[:, 1],
-            pos_ref[:, 2],
-            vel_ref[:, 2],
-            np.zeros(pos_ref.shape[0]),
-            np.zeros(pos_ref.shape[0]),
-            np.zeros(pos_ref.shape[0]),
-            np.zeros(vel_ref.shape[0]),
-            np.zeros(vel_ref.shape[0]),
-            np.zeros(vel_ref.shape[0])
-        ]).transpose()
-        self.action_goal = np.ones(self.action_dim) * self.quadrotor.MASS * self.GRAVITY_ACC / self.action_dim
 
     def _generate_trajectory(self, episode_len_sec, sample_time):  
         """
@@ -131,6 +134,27 @@ class FlightEnv(gym.Env):
                                             physicsClientId=self.PYB_CLIENT)
         pybullet.configureDebugVisualizer(pybullet.COV_ENABLE_RENDERING, 1, physicsClientId=self.PYB_CLIENT)  
         
+        # Set goal state and action
+        pos_ref, vel_ref = self._generate_trajectory(self._episode_len_sec, self._time_step)
+        self.state_goal = np.vstack([
+            pos_ref[:, 0],
+            vel_ref[:, 0],
+            pos_ref[:, 1],
+            vel_ref[:, 1],
+            pos_ref[:, 2],
+            vel_ref[:, 2],
+            np.zeros(pos_ref.shape[0]),
+            np.zeros(pos_ref.shape[0]),
+            np.zeros(pos_ref.shape[0]),
+            np.zeros(vel_ref.shape[0]),
+            np.zeros(vel_ref.shape[0]),
+            np.zeros(vel_ref.shape[0])
+        ]).transpose()
+        self.action_goal = np.ones(self.action_dim) * self.quadrotor.MASS * self.GRAVITY_ACC / self.action_dim
+        
+        self._env_step_counter = 0
+        self._e
+
         return self._get_observation()
     
     def step(self, action):
@@ -145,10 +169,15 @@ class FlightEnv(gym.Env):
           done: Whether the episode has ended.
           info: A dictionary that stores diagnostic information.
         """
+        raw_action = action
         rpm = self._preprocess_action(action)
         self.quadrotor.step(rpm)
-        self._get_observation()
-        reward = self._get_reward()
+        self._env_step_counter += 1
+        obs = self._get_observation()
+        reward = self._get_reward(raw_action)
+        done = self._get_done()
+        info = {}
+        return obs, reward, done, info
 
     def render(self, mode="rgb_array", close=False):
         if mode != "rgb_array":
@@ -179,16 +208,47 @@ class FlightEnv(gym.Env):
         rgb_array = rgb_array[:, :, :3]
         return rgb_array
 
+    def close(self):
+        pass
+
     def _get_observation(self):
         R_wb = pybullet.getMatrixFromQuaternion(self.quadrotor.quat).reshape(3, 3)
         R_bw = R_wb.T
         ang_vel_b = R_bw @ self.quadrotor.ang_vel
-        self._observation = np.hstack([self.quadrotor.pos[0], self.quadrotor.vel[0],
+        self._state = np.hstack([self.quadrotor.pos[0], self.quadrotor.vel[0],
                                        self.quadrotor.pos[1], self.quadrotor.vel[1],
                                        self.quadrotor.pos[2], self.quadrotor.vel[2],
                                        self.quadrotor.rpy, ang_vel_b]).reshape((self.observation_dim,))
-        return self._observation
+        # extend observation with horizon
+        obs = deepcopy(self._state)
+        if self._goal_horizon > 0:
+            wp_idx = [
+                min(self._env_step_counter + 1 + i, self.state_goal.shape[0] - 1)
+                for i in range(self._goal_horizon)
+            ]
+            goal_state = self.state_goal[wp_idx].flatten()
+            obs = np.concatenate([obs, goal_state])
 
+        self._observation = obs
+        return obs
+
+    def _get_reward(self, raw_action):
+        action = np.asarray(raw_action)
+        action_error = action - self.action_goal
+        wp_idx = min(self._env_step_counter, self.state_goal.shape[0] - 1)
+        state_error = self._state - self.state_goal[wp_idx]
+        dist = np.sum(self._reward_state_weight * state_error**2) + np.sum(self._reward_action_weight * action_error**2)
+        reward = -dist
+        if self._reward_exponential:
+            reward = np.exp(reward)
+        return reward
+    
+    def _get_done(self):
+        mask = np.array([1, 0, 1, 0, 1, 0, 1, 1, 1, 0, 0, 0])
+        terminate = np.logical_or(self._state < self._state_space_low
+                                  , self._state > self._state_space_high)
+        return np.any(terminate * mask)
+    
     def seed(self, seed=None):
         """
         Waited to add disturbances
