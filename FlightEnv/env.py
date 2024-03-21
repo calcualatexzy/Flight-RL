@@ -31,6 +31,7 @@ class FlightEnv(gym.Env):
                  verbose=False, 
                  hard_reset=True,
                  goal_horizon=0,
+                 episode_len_sec=10,
                  freq = 50,
                  physics: Physics = Physics.PYB,
                  drone_model ='cf2x',
@@ -82,21 +83,34 @@ class FlightEnv(gym.Env):
         self._observation = np.zeros(self.observation_dim)
         self._norm_observation = np.zeros(self.observation_dim)
 
-        # State space: goal_horizon * 12 states = {observation, goal_horizon1, goal_horizon2, ...} 
-        state_low = observation_low
-        state_high = observation_high
-        if goal_horizon > 0:
-            mul = goal_horizon + 1
-            state_low = np.concatenate([observation_low] * mul)
-            state_high = np.concatenate([observation_high] * mul)
-        
-        self.state_space = gym.spaces.Box(low=state_low, high=state_high, dtype=np.float32)
-        self.state_dim = self.state_space.shape[0]
-
         self._hard_reset = hard_reset
 
         # Set the goal horizon.
-        
+        self._goal_horizon = goal_horizon
+        self._episode_len_sec = episode_len_sec
+        pos_ref, vel_ref = self._generate_trajectory(self._episode_len_sec, self._time_step)
+        self.state_goal = np.vstack([
+            pos_ref[:, 0],
+            vel_ref[:, 0],
+            pos_ref[:, 1],
+            vel_ref[:, 1],
+            pos_ref[:, 2],
+            vel_ref[:, 2],
+            np.zeros(pos_ref.shape[0]),
+            np.zeros(pos_ref.shape[0]),
+            np.zeros(pos_ref.shape[0]),
+            np.zeros(vel_ref.shape[0]),
+            np.zeros(vel_ref.shape[0]),
+            np.zeros(vel_ref.shape[0])
+        ]).transpose()
+        self.action_goal = np.ones(self.action_dim) * self.quadrotor.MASS * self.GRAVITY_ACC / self.action_dim
+
+    def _generate_trajectory(self, episode_len_sec, sample_time):  
+        """
+        TODO: Generate a trajectory for the quadrotor to follow,
+        add velocity and acceleration bounds.
+        """ 
+        pass
 
     def reset(self):
         pybullet.configureDebugVisualizer(pybullet.COV_ENABLE_RENDERING, 0, physicsClientId=self.PYB_CLIENT)        
@@ -133,6 +147,7 @@ class FlightEnv(gym.Env):
         """
         rpm = self._preprocess_action(action)
         self.quadrotor.step(rpm)
+        self._get_observation()
         reward = self._get_reward()
 
     def render(self, mode="rgb_array", close=False):
@@ -172,10 +187,6 @@ class FlightEnv(gym.Env):
                                        self.quadrotor.pos[1], self.quadrotor.vel[1],
                                        self.quadrotor.pos[2], self.quadrotor.vel[2],
                                        self.quadrotor.rpy, ang_vel_b]).reshape((self.observation_dim,))
-        
-        obs = deepcopy(self._observation)
-        # needed to add horizon to get self.state
-
         return self._observation
 
     def seed(self, seed=None):
