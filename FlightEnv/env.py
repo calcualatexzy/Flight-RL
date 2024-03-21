@@ -42,15 +42,21 @@ class FlightEnv(gym.Env):
         self.DEG2RAD = np.pi / 180
         self.GROUND_PLANE_Z = -0.05
 
+        self.RENDER_HEIGHT = 360
+        self.RENDER_WIDTH = 480
+        self._cam_dist = 1.0
+        self._cam_yaw = 0
+        self._cam_pitch = -30
+
         self._verbose = verbose
         self._urdf_path = os.path.join(flight_urdf_root, drone_model + '.urdf')
 
         self._env_step_counter = 0
-        self._render = render
+        self._is_render = render
         self._mode = mode
         self._time_step = 1. / freq
 
-        if self._render:
+        if self._is_render:
             self.PYB_CLIENT = pybullet.connect(pybullet.GUI)
         else:
             self.PYB_CLIENT = pybullet.connect(pybullet.DIRECT)
@@ -63,9 +69,10 @@ class FlightEnv(gym.Env):
         self._physics = Physics(physics)
         self.quadrotor.load_model_param()
 
-        # Action space: 4 motors rpm
+        # Action space: 4 motors thrusts 
         self.action_dim = 4
         action_low, action_high = self._set_action()
+        self.action_bounds = np.array([action_low, action_high])
         self.action_space = gym.spaces.Box(low=action_low, high=action_high, dtype=np.float32)
 
         # Observation space: 12 states = {x, x_dot, y, y_dot, z, z_dot, phi, theta, psi, p_body, q_body, r_body}        
@@ -88,7 +95,8 @@ class FlightEnv(gym.Env):
 
         self._hard_reset = hard_reset
 
-    def reset(self):        
+    def reset(self):
+        pybullet.configureDebugVisualizer(pybullet.COV_ENABLE_RENDERING, 0, physicsClientId=self.PYB_CLIENT)        
         if self._hard_reset:
             pybullet.resetSimulation(physicsClientId=self.PYB_CLIENT)
             pybullet.setGravity(0, 0, -self.GRAVITY_ACC, physicsClientId=self.PYB_CLIENT)
@@ -100,8 +108,57 @@ class FlightEnv(gym.Env):
             self.quadrotor = Quadrotor(pybullet_client=self.PYB_CLIENT, urdf_path=self._urdf_path
                                        , time_step=self._time_step, verbose=self._verbose)
 
+        self.quadrotor.reset(reload_urdf=False)
+
+        pybullet.resetDebugVisualizerCamera(self._cam_dist, self._cam_yaw, self._cam_pitch, [0, 0, 0],
+                                            physicsClientId=self.PYB_CLIENT)
+        pybullet.configureDebugVisualizer(pybullet.COV_ENABLE_RENDERING, 1, physicsClientId=self.PYB_CLIENT)  
+        
+        return self._get_observation()
+    
     def step(self, action):
-        pass
+        """Step forward the simulation, given the action.
+
+        Args:
+        action: A list of motor rpms.
+
+        Returns:
+          observations: 
+          reward: The reward for the current state-action pair.
+          done: Whether the episode has ended.
+          info: A dictionary that stores diagnostic information.
+        """
+        rpm = self._preprocess_action(action)
+        self.quadrotor.step(rpm)
+
+    def render(self, mode="rgb_array", close=False):
+        if mode != "rgb_array":
+            return np.array([])
+        base_pos = self.quadrotor.get_base_position()
+        view_matrix = pybullet.computeViewMatrixFromYawPitchRoll(
+            cameraTargetPosition=base_pos,
+            distance=self._cam_dist,
+            yaw=self._cam_yaw,
+            pitch=self._cam_pitch,
+            roll=0,
+            upAxisIndex=2,
+            physicsClientId=self.PYB_CLIENT)
+        proj_matrix = pybullet.computeProjectionMatrixFOV(fov=60,
+                                                          aspect=float(self.RENDER_WIDTH) /
+                                                          self.RENDER_HEIGHT,
+                                                          nearVal=0.1,
+                                                          farVal=100.0,
+                                                          physicsClientId=self.PYB_CLIENT)
+        (_, _, px, _, _) = pybullet.getCameraImage(width=self.RENDER_WIDTH,
+                                                    height=self.RENDER_HEIGHT,
+                                                    viewMatrix=view_matrix,
+                                                    projectionMatrix=proj_matrix,
+                                                    renderer=pybullet.ER_BULLET_HARDWARE_OPENGL,
+                                                    physicsClientId=self.PYB_CLIENT)
+        
+        rgb_array = np.array(px)
+        rgb_array = rgb_array[:, :, :3]
+        return rgb_array
 
     def _get_observation(self):
         R_wb = pybullet.getMatrixFromQuaternion(self.quadrotor.quat).reshape(3, 3)
@@ -115,6 +172,8 @@ class FlightEnv(gym.Env):
         obs = deepcopy(self._observation)
         # needed to add horizon to get self.state
 
+        return self._observation
+
     def seed(self, seed=None):
         """
         Waited to add disturbances
@@ -122,12 +181,24 @@ class FlightEnv(gym.Env):
         self.np_random, seed = seeding.np_random(seed)
         return [seed]
     
+    def _preprocess_action(self, action):
+        """
+        Preprocess the action to fit the quadrotor's action space.
+        """
+        # TODO: apply disturbance in action 
+
+        action = np.clip(action, self.action_bounds[0], self.action_bounds[1])
+        rpm = self.quadrotor.thrust2rpm(action)
+
+        return rpm
+        
+
     def _set_action(self):
         """
         Return action bounds.
         """
-        action_low = self.KF * (self.quadrotor.PWM2RPM_SCALE * self.quadrotor.MIN_PWM + self.quadrotor.PWM2RPM_CONST)**2
-        action_high = self.KF * (self.quadrotor.PWM2RPM_SCALE * self.quadrotor.MAX_PWM + self.quadrotor.PWM2RPM_CONST)**2
+        action_low = self.quadrotor.KF * (self.quadrotor.PWM2RPM_SCALE * self.quadrotor.MIN_PWM + self.quadrotor.PWM2RPM_CONST)**2
+        action_high = self.quadrotor.KF * (self.quadrotor.PWM2RPM_SCALE * self.quadrotor.MAX_PWM + self.quadrotor.PWM2RPM_CONST)**2
         return np.full(self.action_dim, action_low, np.float32), np.full(self.action_dim, action_high, np.float32)
 
     def _set_observation(self):

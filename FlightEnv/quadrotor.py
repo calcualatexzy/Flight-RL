@@ -29,6 +29,8 @@ class Quadrotor:
 
         self._step_counter = 0
 
+        self.reset(reload_urdf=True)
+
     def reset(self, reload_urdf=True):
         if reload_urdf:
             self.my_quadrotor = pybullet.loadURDF(self._urdf_path, self.INIT_XYZ, 
@@ -83,6 +85,14 @@ class Quadrotor:
         self.rpy = pybullet.getEulerFromQuaternion(self.quat)
 
         self.vel, self.ang_vel = pybullet.getBaseVelocity(self.my_quadrotor, physicsClientId=self.PYB_CLIENT)
+    
+    def get_base_position(self):
+        pos, _ = pybullet.getBasePositionAndOrientation(self.my_quadrotor, physicsClientId=self.PYB_CLIENT)
+        return pos
+    
+    def thrust2rpm(self, thrust):
+        thrust = np.clip(thrust, np.zeros_like(thrust), None) 
+        return np.sqrt(thrust / (4 * self.KF))
 
     def load_model_param(self):
         # Constants.
