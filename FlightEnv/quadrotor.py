@@ -11,7 +11,8 @@ class Quadrotor:
         self._urdf_path = urdf_path
         self._time_step = time_step
 
-
+        self._verbose = verbose
+        
         self.STATE_LABELS = ['x', 'x_dot', 'y', 'y_dot', 'z', 'z_dot',
                                  'phi', 'theta', 'psi', 'p', 'q', 'r']
         self.STATE_UNITS = ['m', 'm/s', 'm', 'm/s', 'm', 'm/s',

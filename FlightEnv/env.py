@@ -12,6 +12,7 @@ import math
 from copy import deepcopy
 
 from FlightEnv.quadrotor import Quadrotor
+from FlightEnv.gen_traj import generate_trajectory
 
 class Physics(str, Enum):
     '''Physics implementations enumeration class.'''
@@ -58,6 +59,7 @@ class FlightEnv(gym.Env):
         self._env_step_counter = 0
         self._is_render = render
         self._mode = mode
+        self._physics = Physics(physics)
         self._time_step = 1. / freq
 
         if self._is_render:
@@ -67,30 +69,30 @@ class FlightEnv(gym.Env):
 
         self._hard_reset = True
 
-        self.seed()
-        self.reset()
-
-        self._physics = Physics(physics)
-        self.quadrotor.load_model_param()
-
         # Set the goal horizon.
         self._goal_horizon = goal_horizon
         self._episode_len_sec = episode_len_sec
+
+        self.action_dim = 4
+        self.state_dim = 12
+        self.observation_dim = 12 * (1 + self._goal_horizon)
+
+        seed = self.seed()
+        self.reset(seed=seed)
 
         self._reward_state_weight = reward_state_weight
         self._reward_action_weight = reward_action_weight
         self._reward_exponential = reward_exponential
 
         # Action space: 4 motors thrusts 
-        self.action_dim = 4
         action_low, action_high = self._set_action()
         self.action_bounds = np.array([action_low, action_high])
         self.action_space = gym.spaces.Box(low=action_low, high=action_high, dtype=np.float32)
 
         # State space: 12 states (no goal horizon)
         # Observation space: 12 states * horizon = {x, x_dot, y, y_dot, z, z_dot, phi, theta, psi, p_body, q_body, r_body}        
-        self.state_dim = 12
         self._state = np.zeros(self.state_dim)
+        self._pos_threshold = [15, 15, self.GROUND_PLANE_Z+15]
         
         observation_low, observation_high = self._set_observation()
         self._state_space_low = observation_low
@@ -102,20 +104,20 @@ class FlightEnv(gym.Env):
             observation_high = np.concatenate([observation_high] * mul)
 
         self.observation_space = gym.spaces.Box(low=observation_low, high=observation_high, dtype=np.float32)
-        self.observation_dim = self.observation_space.shape[0]
         self._observation = np.zeros(self.observation_dim)
         self._norm_observation = np.zeros(self.observation_dim)
-
+        
         self._hard_reset = hard_reset
+
 
     def _generate_trajectory(self, episode_len_sec, sample_time):  
         """
         TODO: Generate a trajectory for the quadrotor to follow,
         add velocity and acceleration bounds.
         """ 
-        pass
+        return generate_trajectory(episode_len_sec, sample_time)
 
-    def reset(self):
+    def reset(self, seed=None, options=None):
         pybullet.configureDebugVisualizer(pybullet.COV_ENABLE_RENDERING, 0, physicsClientId=self.PYB_CLIENT)        
         if self._hard_reset:
             pybullet.resetSimulation(physicsClientId=self.PYB_CLIENT)
@@ -127,6 +129,9 @@ class FlightEnv(gym.Env):
 
             self.quadrotor = Quadrotor(pybullet_client=self.PYB_CLIENT, urdf_path=self._urdf_path
                                        , time_step=self._time_step, verbose=self._verbose)
+            
+            
+            self.quadrotor.load_model_param()
 
         self.quadrotor.reset(reload_urdf=False)
 
@@ -153,9 +158,8 @@ class FlightEnv(gym.Env):
         self.action_goal = np.ones(self.action_dim) * self.quadrotor.MASS * self.GRAVITY_ACC / self.action_dim
         
         self._env_step_counter = 0
-        self._e
 
-        return self._get_observation()
+        return self._get_observation(), {}
     
     def step(self, action):
         """Step forward the simulation, given the action.
@@ -177,7 +181,8 @@ class FlightEnv(gym.Env):
         reward = self._get_reward(raw_action)
         done = self._get_done()
         info = {}
-        return obs, reward, done, info
+        truncated = False
+        return obs, reward, done, truncated, info
 
     def render(self, mode="rgb_array", close=False):
         if mode != "rgb_array":
@@ -212,7 +217,7 @@ class FlightEnv(gym.Env):
         pass
 
     def _get_observation(self):
-        R_wb = pybullet.getMatrixFromQuaternion(self.quadrotor.quat).reshape(3, 3)
+        R_wb = np.array(pybullet.getMatrixFromQuaternion(self.quadrotor.quat)).reshape(3, 3)
         R_bw = R_wb.T
         ang_vel_b = R_bw @ self.quadrotor.ang_vel
         self._state = np.hstack([self.quadrotor.pos[0], self.quadrotor.vel[0],
@@ -247,7 +252,11 @@ class FlightEnv(gym.Env):
         mask = np.array([1, 0, 1, 0, 1, 0, 1, 1, 1, 0, 0, 0])
         terminate = np.logical_or(self._state < self._state_space_low
                                   , self._state > self._state_space_high)
-        return np.any(terminate * mask)
+        done = np.any(np.logical_and(terminate, mask))
+
+        if self._env_step_counter >= self._episode_len_sec / self._time_step:
+            done = True
+        return done
     
     def seed(self, seed=None):
         """
@@ -277,9 +286,9 @@ class FlightEnv(gym.Env):
         return np.full(self.action_dim, action_low, np.float32), np.full(self.action_dim, action_high, np.float32)
 
     def _set_observation(self):
-        x_threshold = 2
-        y_threshold = 2
-        z_threshold = 2
+        x_threshold = self._pos_threshold[0]
+        y_threshold = self._pos_threshold[1]
+        z_threshold = self._pos_threshold[2]
         phi_threshold_radians = 85 * math.pi / 180
         theta_threshold_radians = 85 * math.pi / 180
         psi_threshold_radians = 180 * math.pi / 180  # Do not bound yaw.
@@ -287,7 +296,7 @@ class FlightEnv(gym.Env):
         observation_low = np.array([
                 -x_threshold, -np.finfo(np.float32).max,
                 -y_threshold, -np.finfo(np.float32).max,
-                self.quadrotor.GROUND_PLANE_Z, -np.finfo(np.float32).max,
+                self.GROUND_PLANE_Z, -np.finfo(np.float32).max,
                 -phi_threshold_radians, -theta_threshold_radians, -psi_threshold_radians,
                 -np.finfo(np.float32).max, -np.finfo(np.float32).max, -np.finfo(np.float32).max
             ])
