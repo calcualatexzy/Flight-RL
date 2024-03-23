@@ -18,7 +18,7 @@ class Quadrotor:
         self.STATE_UNITS = ['m', 'm/s', 'm', 'm/s', 'm', 'm/s',
                                 'rad', 'rad', 'rad', 'rad/s', 'rad/s', 'rad/s']
         
-        self.INIT_XYZ = np.array([0, 0, 0.5])
+        self.INIT_XYZ = np.array([0, 0, 5])
         self.INIT_RPY = np.array([0, 0, 0])
         
         self.pos = np.zeros(3)

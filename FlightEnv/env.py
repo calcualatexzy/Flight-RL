@@ -32,7 +32,7 @@ class FlightEnv(gym.Env):
                  verbose=False, 
                  hard_reset=True,
                  reward_state_weight=1.0,
-                 reward_action_weight=0.0001,
+                 reward_action_weight=0.001,
                  reward_exponential=False,
                  goal_horizon=0,
                  episode_len_sec=10,

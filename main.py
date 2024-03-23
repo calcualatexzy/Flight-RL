@@ -3,6 +3,8 @@ from stable_baselines3 import PPO
 import gymnasium as gym
 import torch
 
+import argparse
+
 def train():
     log_dir = "logs/"
 
@@ -18,7 +20,7 @@ def train():
                 policy_kwargs=policy_kargs, 
                 tensorboard_log=log_dir, verbose=1,
                 device=device)
-    model.learn(total_timesteps=13*1e6, reset_num_timesteps=True, tb_log_name="ppo_flight_env")
+    model.learn(total_timesteps=200000, reset_num_timesteps=True, tb_log_name="ppo_flight_env")
     
     model.save("QuadrotorPPO")
 
@@ -35,5 +37,12 @@ def load():
 
 
 if __name__ == "__main__":
-    # train()
-    load()
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--train", action="store_true")
+    parser.add_argument("--load", action="store_true")
+    args = parser.parse_args()
+
+    if args.train:
+        train()
+    elif args.load:
+        load()
