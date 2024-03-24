@@ -20,7 +20,7 @@ def train():
                 policy_kwargs=policy_kargs, 
                 tensorboard_log=log_dir, verbose=1,
                 device=device)
-    model.learn(total_timesteps=200000, reset_num_timesteps=True, tb_log_name="ppo_flight_env")
+    model.learn(total_timesteps=2*1e6, reset_num_timesteps=True, tb_log_name="ppo_flight_env")
     
     model.save("QuadrotorPPO")
 

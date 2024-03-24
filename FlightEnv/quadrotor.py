@@ -18,7 +18,7 @@ class Quadrotor:
         self.STATE_UNITS = ['m', 'm/s', 'm', 'm/s', 'm', 'm/s',
                                 'rad', 'rad', 'rad', 'rad/s', 'rad/s', 'rad/s']
         
-        self.INIT_XYZ = np.array([0, 0, 5])
+        self.INIT_XYZ = np.array([0, 0, 0])
         self.INIT_RPY = np.array([0, 0, 0])
         
         self.pos = np.zeros(3)
@@ -37,6 +37,7 @@ class Quadrotor:
             self.my_quadrotor = pybullet.loadURDF(self._urdf_path, self.INIT_XYZ, 
                                                   pybullet.getQuaternionFromEuler(self.INIT_RPY), 
                                                   physicsClientId=self.PYB_CLIENT)
+
             pybullet.changeDynamics(self.my_quadrotor, -1, linearDamping=0, angularDamping=0)
 
             self._update_and_store_kinematic_information()
@@ -74,6 +75,7 @@ class Quadrotor:
                                  posObj=[0, 0, 0],
                                  flags=pybullet.LINK_FRAME,
                                  physicsClientId=self.PYB_CLIENT)
+        
         pybullet.applyExternalTorque(self.my_quadrotor,
                               4,
                               torqueObj=[0, 0, z_torque],
@@ -93,7 +95,7 @@ class Quadrotor:
     
     def thrust2rpm(self, thrust):
         thrust = np.clip(thrust, np.zeros_like(thrust), None) 
-        return np.sqrt(thrust / (4 * self.KF))
+        return np.sqrt(thrust / self.KF)
 
     def load_model_param(self):
         # Constants.

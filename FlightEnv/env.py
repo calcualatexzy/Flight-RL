@@ -36,7 +36,8 @@ class FlightEnv(gym.Env):
                  reward_exponential=False,
                  goal_horizon=0,
                  episode_len_sec=10,
-                 freq = 50,
+                 ctrl_freq = 50,
+                 pybullet_freq = 1000,
                  physics: Physics = Physics.PYB,
                  drone_model ='cf2x',
                  flight_urdf_root="FlightEnv/assets"):
@@ -60,7 +61,8 @@ class FlightEnv(gym.Env):
         self._is_render = render
         self._mode = mode
         self._physics = Physics(physics)
-        self._time_step = 1. / freq
+        self._time_step = 1. / ctrl_freq
+        self._pybullet_time_step = 1. / pybullet_freq
 
         if self._is_render:
             self.PYB_CLIENT = pybullet.connect(pybullet.GUI)
@@ -123,7 +125,7 @@ class FlightEnv(gym.Env):
             pybullet.resetSimulation(physicsClientId=self.PYB_CLIENT)
             pybullet.setGravity(0, 0, -self.GRAVITY_ACC, physicsClientId=self.PYB_CLIENT)
             pybullet.setRealTimeSimulation(0, physicsClientId=self.PYB_CLIENT)
-            pybullet.setTimeStep(self._time_step, physicsClientId=self.PYB_CLIENT)
+            pybullet.setTimeStep(self._pybullet_time_step, physicsClientId=self.PYB_CLIENT)
             self._ground_id = pybullet.loadURDF("%s/plane.urdf" % pybullet_data.getDataPath(), [0, 0, self.GROUND_PLANE_Z]
                                                 , physicsClientId=self.PYB_CLIENT)
 
@@ -158,8 +160,9 @@ class FlightEnv(gym.Env):
         self.action_goal = np.ones(self.action_dim) * self.quadrotor.MASS * self.GRAVITY_ACC / self.action_dim
         
         self._env_step_counter = 0
+        self._out_of_bounds = False
 
-        return self._get_observation(), {}
+        return self._get_observation(), self._get_info()
     
     def step(self, action):
         """Step forward the simulation, given the action.
@@ -173,6 +176,8 @@ class FlightEnv(gym.Env):
           done: Whether the episode has ended.
           info: A dictionary that stores diagnostic information.
         """
+        if self._env_step_counter == 0:
+            action = self.action_goal
         raw_action = action
         rpm = self._preprocess_action(action)
         self.quadrotor.step(rpm)
@@ -180,7 +185,7 @@ class FlightEnv(gym.Env):
         obs = self._get_observation()
         reward = self._get_reward(raw_action)
         done = self._get_done()
-        info = {}
+        info = self._get_info()
         truncated = False
         return obs, reward, done, truncated, info
 
@@ -243,18 +248,29 @@ class FlightEnv(gym.Env):
         wp_idx = min(self._env_step_counter, self.state_goal.shape[0] - 1)
         state_error = self._state - self.state_goal[wp_idx]
         dist = np.sum(self._reward_state_weight * state_error**2) + np.sum(self._reward_action_weight * action_error**2)
+        if self._out_of_bounds:
+            dist += 1e4
         reward = -dist
         if self._reward_exponential:
             reward = np.exp(reward)
         return reward
+
+    def _get_info(self):
+        info = {}
+        info['out_of_bounds'] = self._out_of_bounds 
+
+        return info
     
     def _get_done(self):
         mask = np.array([1, 0, 1, 0, 1, 0, 1, 1, 1, 0, 0, 0])
         terminate = np.logical_or(self._state < self._state_space_low
                                   , self._state > self._state_space_high)
         done = np.any(np.logical_and(terminate, mask))
-
+        if done:
+            self._out_of_bounds = True
         if self._env_step_counter >= self._episode_len_sec / self._time_step:
+            if not done:
+                self._out_of_bounds = False
             done = True
         return done
     

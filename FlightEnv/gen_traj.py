@@ -12,7 +12,7 @@ def generate_trajectory(episode_len_sec, sample_time):
         # Generate trajectory
         x = amplitude * np.sin(2 * np.pi * frequency * t) + offset
         y = amplitude * np.sin(4 * np.pi * frequency * t) + offset
-        z = np.linspace(5, 10, len(t))  # Linear trajectory in z-direction
+        z = np.linspace(0, 10, len(t))  # Linear trajectory in z-direction
 
         # Assuming quadrotor starts at rest, velocity and acceleration are zero
         vx = np.gradient(x, sample_time)
