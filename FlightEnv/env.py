@@ -34,12 +34,12 @@ class FlightEnv(gym.Env):
                  hard_reset=True,
                  # reward_state_weight should be a diagonal matrix
                  reward_state_pos_weight=1.0,
-                 reward_state_vel_weight=0.1,
-                 reward_state_attitude_weight=0.1,
+                 reward_state_vel_weight=0.01,
+                 reward_state_attitude_weight=0.5,
                  reward_state_ang_vel_weight=0.01,
-                 reward_action_weight=0.001,
-                 reward_exponential=False,
-                 goal_horizon=0,
+                 reward_action_weight=0.0001,
+                 reward_exponential=True,
+                 goal_horizon=10,
                  episode_len_sec=10,
                  ctrl_freq = 60,
                  pybullet_freq = 240,
@@ -128,7 +128,7 @@ class FlightEnv(gym.Env):
         TODO: Generate a trajectory for the quadrotor to follow,
         add velocity and acceleration bounds.
         """ 
-        return generate_trajectory(episode_len_sec, sample_time)
+        return generate_trajectory(episode_len_sec=episode_len_sec, sample_time=sample_time)
 
     def reset(self, seed=None, options=None):
         pybullet.configureDebugVisualizer(pybullet.COV_ENABLE_RENDERING, 0, physicsClientId=self.PYB_CLIENT)        
@@ -253,7 +253,7 @@ class FlightEnv(gym.Env):
         self._state = np.hstack([self.quadrotor.pos[0], self.quadrotor.vel[0],
                                        self.quadrotor.pos[1], self.quadrotor.vel[1],
                                        self.quadrotor.pos[2], self.quadrotor.vel[2],
-                                       self.quadrotor.rpy, ang_vel_b]).reshape((self.observation_dim,))
+                                       self.quadrotor.rpy, ang_vel_b]).reshape((self.state_dim,))
         # extend observation with horizon
         obs = deepcopy(self._state)
         if self._goal_horizon > 0:
@@ -274,9 +274,12 @@ class FlightEnv(gym.Env):
         state_error = self._state - self.state_goal[wp_idx]
         dist = np.sum(state_error @ self._reward_state_Q @ state_error) + self._reward_action_weight * np.sum(action_error**2)
         reward = -dist
-        # if too close to the ground, give a negative reward
-        if self._state[5] < self.GROUND_PLANE_Z + 0.1:
-            reward -= 10
+        # # if too close to the ground, give a negative reward
+        # if self._state[5] < self.GROUND_PLANE_Z + 0.1:
+        #     reward -= 10
+        # # if exactly at the goal, give a positive reward
+        # if np.linalg.norm(state_error) < 1e-2:
+        #     reward += 100
         if self._reward_exponential:
             reward = np.exp(reward)
         return reward

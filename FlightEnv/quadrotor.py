@@ -18,7 +18,9 @@ class Quadrotor:
         self.STATE_UNITS = ['m', 'm/s', 'm', 'm/s', 'm', 'm/s',
                                 'rad', 'rad', 'rad', 'rad/s', 'rad/s', 'rad/s']
         
-        self.INIT_XYZ = np.array([1, 1, 0])
+        self.INIT_XYZ = np.array([0, 0, 0.25])
+        self.INIT_VEL = np.array([0, 0, 0])
+        self.INIT_ANG_VEL = np.array([0, 0, 0])
         self.INIT_RPY = np.array([0, 0, 0])
         
         self.pos = np.zeros(3)
@@ -45,7 +47,8 @@ class Quadrotor:
             pybullet.resetBasePositionAndOrientation(self.my_quadrotor, self.INIT_XYZ, 
                                                      pybullet.getQuaternionFromEuler(self.INIT_RPY), 
                                                      physicsClientId=self.PYB_CLIENT)
-            pybullet.resetBaseVelocity(self.my_quadrotor, [0, 0, 0], [0, 0, 0], physicsClientId=self.PYB_CLIENT)
+            pybullet.resetBaseVelocity(self.my_quadrotor, self.INIT_VEL, self.INIT_ANG_VEL, 
+                                      physicsClientId=self.PYB_CLIENT)
 
             self._update_and_store_kinematic_information()
 
