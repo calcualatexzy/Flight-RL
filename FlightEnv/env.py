@@ -10,6 +10,7 @@ import numpy as np
 import xml.etree.ElementTree as etxml
 import math
 from copy import deepcopy
+import time
 
 from FlightEnv.quadrotor import Quadrotor
 from FlightEnv.gen_traj import generate_trajectory
@@ -37,7 +38,7 @@ class FlightEnv(gym.Env):
                  goal_horizon=0,
                  episode_len_sec=10,
                  ctrl_freq = 50,
-                 pybullet_freq = 1000,
+                 pybullet_freq = 240,
                  physics: Physics = Physics.PYB,
                  drone_model ='cf2x',
                  flight_urdf_root="FlightEnv/assets"):
@@ -108,7 +109,7 @@ class FlightEnv(gym.Env):
         self.observation_space = gym.spaces.Box(low=observation_low, high=observation_high, dtype=np.float32)
         self._observation = np.zeros(self.observation_dim)
         self._norm_observation = np.zeros(self.observation_dim)
-        
+
         self._hard_reset = hard_reset
 
 
@@ -134,6 +135,7 @@ class FlightEnv(gym.Env):
             
             
             self.quadrotor.load_model_param()
+
 
         self.quadrotor.reset(reload_urdf=False)
 
@@ -161,6 +163,12 @@ class FlightEnv(gym.Env):
         
         self._env_step_counter = 0
         self._out_of_bounds = False
+
+        if self._hard_reset:
+            if self._is_render:
+                # User debug draw failed
+                self._debug_line()
+                
 
         return self._get_observation(), self._get_info()
     
@@ -220,6 +228,13 @@ class FlightEnv(gym.Env):
 
     def close(self):
         pass
+
+    def _debug_line(self):
+        for i in range(self.state_goal.shape[0]-1):
+                    pybullet.addUserDebugLine([self.state_goal[i, 0], self.state_goal[i, 2], self.state_goal[i, 4]],
+                                            [self.state_goal[i+1, 0], self.state_goal[i+1, 2], self.state_goal[i+1, 4]],
+                                            lineColorRGB=[1, 0, 0], lineWidth=1,
+                                            physicsClientId=self.PYB_CLIENT)
 
     def _get_observation(self):
         R_wb = np.array(pybullet.getMatrixFromQuaternion(self.quadrotor.quat)).reshape(3, 3)
