@@ -32,12 +32,16 @@ class FlightEnv(gym.Env):
     def __init__(self, render=False, mode="Hover",
                  verbose=False, 
                  hard_reset=True,
-                 reward_state_weight=1.0,
+                 # reward_state_weight should be a diagonal matrix
+                 reward_state_pos_weight=1.0,
+                 reward_state_vel_weight=0.1,
+                 reward_state_attitude_weight=0.1,
+                 reward_state_ang_vel_weight=0.01,
                  reward_action_weight=0.001,
                  reward_exponential=False,
                  goal_horizon=0,
                  episode_len_sec=10,
-                 ctrl_freq = 50,
+                 ctrl_freq = 60,
                  pybullet_freq = 240,
                  physics: Physics = Physics.PYB,
                  drone_model ='cf2x',
@@ -83,7 +87,13 @@ class FlightEnv(gym.Env):
         seed = self.seed()
         self.reset(seed=seed)
 
-        self._reward_state_weight = reward_state_weight
+        self._reward_state_Q = np.diag([
+            reward_state_pos_weight, reward_state_pos_weight, reward_state_pos_weight,
+            reward_state_vel_weight, reward_state_vel_weight, reward_state_vel_weight,
+            reward_state_attitude_weight, reward_state_attitude_weight, reward_state_attitude_weight,
+            reward_state_ang_vel_weight, reward_state_ang_vel_weight, reward_state_ang_vel_weight
+        ])
+
         self._reward_action_weight = reward_action_weight
         self._reward_exponential = reward_exponential
 
@@ -262,10 +272,11 @@ class FlightEnv(gym.Env):
         action_error = action - self.action_goal
         wp_idx = min(self._env_step_counter, self.state_goal.shape[0] - 1)
         state_error = self._state - self.state_goal[wp_idx]
-        dist = np.sum(self._reward_state_weight * state_error**2) + np.sum(self._reward_action_weight * action_error**2)
-        if self._out_of_bounds:
-            dist += 1e4
+        dist = np.sum(state_error @ self._reward_state_Q @ state_error) + self._reward_action_weight * np.sum(action_error**2)
         reward = -dist
+        # if too close to the ground, give a negative reward
+        if self._state[5] < self.GROUND_PLANE_Z + 0.1:
+            reward -= 10
         if self._reward_exponential:
             reward = np.exp(reward)
         return reward
