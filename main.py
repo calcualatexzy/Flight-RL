@@ -9,7 +9,7 @@ def train():
     log_dir = "logs/"
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
+    #device = torch.device("cpu")
     env = FlightEnv()
     policy_kargs = dict(
         activation_fn=torch.nn.ReLU,
