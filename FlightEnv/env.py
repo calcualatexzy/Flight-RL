@@ -14,6 +14,7 @@ import time
 
 from FlightEnv.quadrotor import Quadrotor
 from FlightEnv.gen_traj import generate_trajectory
+from FlightEnv.gen_line import generate_line
 
 class Physics(str, Enum):
     '''Physics implementations enumeration class.'''
@@ -38,10 +39,12 @@ class FlightEnv(gym.Env):
                  reward_state_attitude_weight=0.5,
                  reward_state_ang_vel_weight=0.01,
                  reward_action_weight=0.0001,
+                 reward_constraint_pos_radius=0.1,
+                 reward_constraint_pos_weight=1.0,
                  reward_exponential=True,
-                 goal_horizon=10,
+                 goal_horizon=1,
                  episode_len_sec=10,
-                 ctrl_freq = 60,
+                 ctrl_freq = 50,
                  pybullet_freq = 240,
                  physics: Physics = Physics.PYB,
                  drone_model ='cf2x',
@@ -93,6 +96,7 @@ class FlightEnv(gym.Env):
             reward_state_attitude_weight, reward_state_attitude_weight, reward_state_attitude_weight,
             reward_state_ang_vel_weight, reward_state_ang_vel_weight, reward_state_ang_vel_weight
         ])
+        self.reward_constraint_pos_radius = reward_constraint_pos_radius
 
         self._reward_action_weight = reward_action_weight
         self._reward_exponential = reward_exponential
@@ -128,7 +132,8 @@ class FlightEnv(gym.Env):
         TODO: Generate a trajectory for the quadrotor to follow,
         add velocity and acceleration bounds.
         """ 
-        return generate_trajectory(episode_len_sec=episode_len_sec, sample_time=sample_time)
+        # return generate_trajectory(episode_len_sec=episode_len_sec, sample_time=sample_time)
+        return generate_line(episode_len_sec=episode_len_sec, sample_time=sample_time)
 
     def reset(self, seed=None, options=None):
         pybullet.configureDebugVisualizer(pybullet.COV_ENABLE_RENDERING, 0, physicsClientId=self.PYB_CLIENT)        
@@ -202,10 +207,10 @@ class FlightEnv(gym.Env):
         self._env_step_counter += 1
         obs = self._get_observation()
         reward = self._get_reward(raw_action)
-        done = self._get_done()
+        terminated = self._get_ternimated()
         info = self._get_info()
         truncated = False
-        return obs, reward, done, truncated, info
+        return obs, reward, terminated, truncated, info
 
     def render(self, mode="rgb_array", close=False):
         if mode != "rgb_array":
@@ -274,12 +279,16 @@ class FlightEnv(gym.Env):
         state_error = self._state - self.state_goal[wp_idx]
         dist = np.sum(state_error @ self._reward_state_Q @ state_error) + self._reward_action_weight * np.sum(action_error**2)
         reward = -dist
-        # # if too close to the ground, give a negative reward
-        # if self._state[5] < self.GROUND_PLANE_Z + 0.1:
-        #     reward -= 10
-        # # if exactly at the goal, give a positive reward
-        # if np.linalg.norm(state_error) < 1e-2:
-        #     reward += 100
+        # constraint penalty
+        # pos constraint: radius penalty
+        pos = np.array([self._state[0], self._state[2], self._state[4]])
+        goal_pos = np.array([self.state_goal[wp_idx, 0], self.state_goal[wp_idx, 2], self.state_goal[wp_idx, 4]])
+        last_goal_pos = np.array([self.state_goal[wp_idx - 1, 0], self.state_goal[wp_idx - 1, 2], self.state_goal[wp_idx - 1, 4]])
+        adj_pos = np.linalg.norm(last_goal_pos - goal_pos)
+        self.reward_constraint_pos_radius = max(self.reward_constraint_pos_radius, adj_pos * self._goal_horizon * 2)
+        if np.linalg.norm(pos - goal_pos) > self.reward_constraint_pos_radius:
+            reward -= 1
+            
         if self._reward_exponential:
             reward = np.exp(reward)
         return reward
@@ -290,18 +299,18 @@ class FlightEnv(gym.Env):
 
         return info
     
-    def _get_done(self):
+    def _get_ternimated(self):
         mask = np.array([1, 0, 1, 0, 1, 0, 1, 1, 1, 0, 0, 0])
         terminate = np.logical_or(self._state < self._state_space_low
                                   , self._state > self._state_space_high)
-        done = np.any(np.logical_and(terminate, mask))
-        if done:
+        terminated = np.any(np.logical_and(terminate, mask))
+        if terminated:
             self._out_of_bounds = True
         if self._env_step_counter >= self._episode_len_sec / self._time_step:
-            if not done:
+            if not terminated:
                 self._out_of_bounds = False
-            done = True
-        return done
+            terminated = True
+        return terminated
     
     def seed(self, seed=None):
         """
