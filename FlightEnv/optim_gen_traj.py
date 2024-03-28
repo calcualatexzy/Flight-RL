@@ -1,7 +1,10 @@
 import numpy as np
 import math
 from scipy.optimize import minimize
+import time
 
+import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D
 def bezier_curve(t, control_points):
     """
     Evaluate a point on the Bezier curve given parameter t and control points.
@@ -30,15 +33,15 @@ def trajectory(control_points, eval_points, total_time):
         # Compute the squared differences between consecutive velocity differences for acceleration
         acceleration_diffs = np.diff(velocity_diffs, axis=0)
         # Objective function is the sum of squared acceleration differences
-        return np.sum(acceleration_diffs ** 2)
+        # start and end velocities are zero
+        penalty = 1000
+        penalty_z = 0.1
+        return np.sum(acceleration_diffs ** 2) + penalty * (velocity_diffs[0] ** 2).sum() + penalty * (velocity_diffs[-1] ** 2).sum() + penalty_z * (velocity_diffs[:, 2] ** 2).sum()
     
     # Define constraints to ensure start and end points are constrained
     constraints = [
         {'type': 'eq', 'fun': lambda x: x[:3] - control_points[0]},  # Start point constraint
         {'type': 'eq', 'fun': lambda x: x[-3:] - control_points[-1]},  # End point constraint
-        # start and end velocities are zero
-        {'type': 'eq', 'fun': lambda x: bezier_curve(0, x.reshape(num_control_points, -1)) - control_points[0]},
-        {'type': 'eq', 'fun': lambda x: bezier_curve(1, x.reshape(num_control_points, -1)) - control_points[-1]}
         ]
     
     # Bounds for optimization (None means unbounded)
@@ -60,36 +63,29 @@ def trajectory(control_points, eval_points, total_time):
     
     # Compute velocities
     velocities = np.diff(trajectory_points, axis=0) / (total_time / (num_eval_points - 1))
+    velocities = np.concatenate((velocities, velocities[-1][np.newaxis]), axis=0)
     
     # Compute accelerations
     accelerations = np.diff(velocities, axis=0) / (total_time / (num_eval_points - 1))
+    accelerations = np.concatenate((accelerations, accelerations[-1][np.newaxis]), axis=0)
     
     return trajectory_points, velocities, accelerations
 
 def generate_trajectory(episode_len_sec, sample_time, average_speed):
     max_position = episode_len_sec * average_speed
     # Example control points
-    control_points_num = 8
+    control_points_num = 6
     control_points = np.random.uniform(low=0, high=max_position, size=(control_points_num, 3))
     # start and end points
-    control_points[0] = [0, 0, 0]
-    control_points[-1] = [max_position, max_position, max_position]
+    control_points[0] = [0, 0, 0.5]
+    control_points[-1] = [max_position, max_position, 2.5]
     eval_points = int(episode_len_sec / sample_time)
     trajectory_points, velocities, accelerations = trajectory(control_points, eval_points, episode_len_sec)
 
 
     return trajectory_points, velocities, accelerations
 
-# Example usage
-if __name__ == "__main__":
-    episode_len_sec = 10
-    sample_time = 0.01
-    average_speed = 3
-    trajectory_points, velocities, accelerations = generate_trajectory(episode_len_sec, sample_time, average_speed)
-    # Plotting
-    import matplotlib.pyplot as plt
-    from mpl_toolkits.mplot3d import Axes3D
-
+def plot_trajectory(trajectory_points, velocities, accelerations):
     fig = plt.figure()
     ax = fig.add_subplot(111, projection='3d')
     ax.plot(trajectory_points[:, 0], trajectory_points[:, 1], trajectory_points[:, 2], label='Trajectory')
@@ -104,4 +100,47 @@ if __name__ == "__main__":
     ax.plot(velocities[:, 1], label='Y Velocity')
     ax.plot(velocities[:, 2], label='Z Velocity')
     ax.legend()
+
+    # Acceleration plot
+    fig, ax = plt.subplots()
+    ax.plot(accelerations[:, 0], label='X Acceleration')
+    ax.plot(accelerations[:, 1], label='Y Acceleration')
+    ax.plot(accelerations[:, 2], label='Z Acceleration')
+    ax.legend()
     plt.show()
+
+def save_trajectory(cnt, trajectory_points, velocities, accelerations):
+    # Save the trajectory points, velocities, and accelerations to a file, reading them back in dictionary format
+    np.savez(f'FlightEnv/TrajLib/traj_50Hz_len10_vel1/{cnt}.npz', trajectory_points=trajectory_points, velocities=velocities, accelerations=accelerations)
+
+def load_trajectory(episode_len_sec, sample_time, average_speed):
+    # from the episode length and sample time, get the folder name
+    freq = int(1/sample_time)
+    folder_name = f'FlightEnv/TrajLib/traj_{freq}Hz_len{episode_len_sec}_vel{average_speed}/'
+    num_files = 100
+    file_num = np.random.randint(num_files)
+    data = np.load(f'{folder_name}{file_num}.npz')
+    trajectory_points = data['trajectory_points']
+    velocities = data['velocities']
+    accelerations = data['accelerations']
+    return trajectory_points, velocities, accelerations
+
+if __name__ == "__main__":
+    episode_len_sec = 10
+    sample_time = 0.02
+    average_speed = 1
+
+    # start_time = time.time()
+    for i in range(100):
+        trajectory_points, velocities, accelerations = generate_trajectory(episode_len_sec, sample_time, average_speed)
+        save_trajectory(i, trajectory_points, velocities, accelerations)
+    # print("Time taken: ", time.time() - start_time)
+    # trajectory_points, velocities, accelerations = generate_trajectory(episode_len_sec, sample_time, average_speed)
+
+    # Plotting
+    # print(trajectory_points.shape, velocities.shape, accelerations.shape)
+    # plot_trajectory(trajectory_points, velocities, accelerations)
+
+    # Loading
+    # load_trajectory(0)
+
