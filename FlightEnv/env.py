@@ -39,10 +39,10 @@ class FlightEnv(gym.Env):
                  reward_state_attitude_weight=0.5,
                  reward_state_ang_vel_weight=0.01,
                  reward_action_weight=0.0001,
-                 reward_constraint_pos_radius=0.1,
-                 reward_constraint_pos_weight=1.0,
+                 reward_constraint_pos_radius=0.5,
+                 reward_constraint_pos_penalty=1.0,
                  reward_exponential=True,
-                 goal_horizon=1,
+                 goal_horizon=10,
                  episode_len_sec=10,
                  ctrl_freq = 50,
                  pybullet_freq = 240,
@@ -97,6 +97,7 @@ class FlightEnv(gym.Env):
             reward_state_ang_vel_weight, reward_state_ang_vel_weight, reward_state_ang_vel_weight
         ])
         self.reward_constraint_pos_radius = reward_constraint_pos_radius
+        self.reward_constraint_pos_penalty = reward_constraint_pos_penalty
 
         self._reward_action_weight = reward_action_weight
         self._reward_exponential = reward_exponential
@@ -205,6 +206,7 @@ class FlightEnv(gym.Env):
         rpm = self._preprocess_action(action)
         self.quadrotor.step(rpm)
         self._env_step_counter += 1
+        # print(self._env_step_counter)
         obs = self._get_observation()
         reward = self._get_reward(raw_action)
         terminated = self._get_ternimated()
@@ -287,7 +289,7 @@ class FlightEnv(gym.Env):
         adj_pos = np.linalg.norm(last_goal_pos - goal_pos)
         self.reward_constraint_pos_radius = max(self.reward_constraint_pos_radius, adj_pos * self._goal_horizon * 2)
         if np.linalg.norm(pos - goal_pos) > self.reward_constraint_pos_radius:
-            reward -= 1
+            reward -= self.reward_constraint_pos_penalty
             
         if self._reward_exponential:
             reward = np.exp(reward)
