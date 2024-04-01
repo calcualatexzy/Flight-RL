@@ -135,10 +135,10 @@ class FlightEnv(gym.Env):
         add velocity and acceleration bounds.
         """ 
         # return generate_trajectory(episode_len_sec=episode_len_sec, sample_time=sample_time)
-        # return generate_line(episode_len_sec=episode_len_sec, sample_time=sample_time)
-        average_speed = 1
-        pos, vel, _ = load_trajectory(episode_len_sec=episode_len_sec, sample_time=sample_time, average_speed=average_speed)
-        return pos, vel
+        return generate_line(episode_len_sec=episode_len_sec, sample_time=sample_time)
+        # average_speed = 1
+        # pos, vel, _ = load_trajectory(episode_len_sec=episode_len_sec, sample_time=sample_time, average_speed=average_speed)
+        # return pos, vel
 
     def reset(self, seed=None, options=None):
         pybullet.configureDebugVisualizer(pybullet.COV_ENABLE_RENDERING, 0, physicsClientId=self.PYB_CLIENT)        
