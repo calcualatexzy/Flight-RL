@@ -45,7 +45,7 @@ class FlightEnv(gym.Env):
                  reward_exponential=True,
                  goal_horizon=50,
                  episode_len_sec=10,
-                 ctrl_freq = 50,
+                 ctrl_freq = 100,
                  pybullet_freq = 240,
                  physics: Physics = Physics.PYB,
                  drone_model ='cf2x',
@@ -136,11 +136,7 @@ class FlightEnv(gym.Env):
         """ 
         # return generate_trajectory(episode_len_sec=episode_len_sec, sample_time=sample_time)
         return generate_line(episode_len_sec=episode_len_sec, sample_time=sample_time)
-<<<<<<< HEAD
         # average_speed = 0.4
-=======
-        # average_speed = 1
->>>>>>> 739ac9128338e5bff2a81786ff33e68e543e7eb2
         # pos, vel, _ = load_trajectory(episode_len_sec=episode_len_sec, sample_time=sample_time, average_speed=average_speed)
         # return pos, vel
 

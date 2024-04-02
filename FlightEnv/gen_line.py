@@ -7,7 +7,7 @@ def generate_line(episode_len_sec=10, sample_time=0.01):
 
     num_waypoints = int(episode_len_sec / sample_time)
 
-    max_vel = 0.5
+    max_vel = 2 * np.linalg.norm(end_pos - start_pos) / episode_len_sec
     vel = np.linspace(0, max_vel, num_waypoints // 2)
     vel = np.concatenate((vel, vel[::-1]))
 

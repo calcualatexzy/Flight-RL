@@ -1,17 +1,24 @@
 from FlightEnv.env import FlightEnv
 from stable_baselines3 import PPO
 from stable_baselines3.common.callbacks import CheckpointCallback
+from stable_baselines3.common.vec_env import SubprocVecEnv
+from stable_baselines3.common.vec_env import VecMonitor
 import gymnasium as gym
 import torch
 
-
+import multiprocessing
 import argparse
 
 def train():
     try:
         log_dir = "logs/"
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        env = FlightEnv()
+
+        num_envs = 4
+        multiprocessing.freeze_support()
+        env = SubprocVecEnv([lambda: FlightEnv() for _ in range(num_envs)])
+        env = VecMonitor(env)
+        # env = FlightEnv()
         policy_kargs = dict(
             activation_fn=torch.nn.ReLU,
             net_arch=dict(pi=[256, 128], vf=[256, 128]))
