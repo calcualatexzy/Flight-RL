@@ -11,9 +11,13 @@ def generate_line(episode_len_sec=10, sample_time=0.01):
     vel = np.linspace(0, max_vel, num_waypoints // 2)
     vel = np.concatenate((vel, vel[::-1]))
 
+    acc = max_vel / (episode_len_sec / 2)
+    acc = np.concatenate((acc * np.ones(num_waypoints // 2), -acc * np.ones(num_waypoints // 2)))
+
     time = np.linspace(0, 1, num_waypoints)[:, np.newaxis]
     waypoints = start_pos + time * (end_pos - start_pos)
 
     velocities = np.column_stack((vel, vel, np.zeros_like(vel)))
+    accelerations = np.column_stack((acc, acc, np.zeros_like(acc)))
     
-    return waypoints, velocities
+    return waypoints, velocities, accelerations

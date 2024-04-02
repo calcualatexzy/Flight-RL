@@ -137,8 +137,8 @@ class FlightEnv(gym.Env):
         # return generate_trajectory(episode_len_sec=episode_len_sec, sample_time=sample_time)
         return generate_line(episode_len_sec=episode_len_sec, sample_time=sample_time)
         # average_speed = 0.4
-        # pos, vel, _ = load_trajectory(episode_len_sec=episode_len_sec, sample_time=sample_time, average_speed=average_speed)
-        # return pos, vel
+        # pos, vel, acc = load_trajectory(episode_len_sec=episode_len_sec, sample_time=sample_time, average_speed=average_speed)
+        # return pos, vel, acc
 
     def reset(self, seed=None, options=None):
         pybullet.configureDebugVisualizer(pybullet.COV_ENABLE_RENDERING, 0, physicsClientId=self.PYB_CLIENT)        
@@ -164,7 +164,7 @@ class FlightEnv(gym.Env):
         pybullet.configureDebugVisualizer(pybullet.COV_ENABLE_RENDERING, 1, physicsClientId=self.PYB_CLIENT)  
         
         # Set goal state and action
-        pos_ref, vel_ref = self._generate_trajectory(self._episode_len_sec, self._time_step)
+        pos_ref, vel_ref, acc_ref = self._generate_trajectory(self._episode_len_sec, self._time_step)
         self.state_goal = np.vstack([
             pos_ref[:, 0],
             vel_ref[:, 0],

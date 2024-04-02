@@ -67,7 +67,9 @@ def trajectory(control_points, eval_points, total_time):
     
     # Compute accelerations
     accelerations = np.diff(velocities, axis=0) / (total_time / (num_eval_points - 1))
-    accelerations = np.concatenate((accelerations, accelerations[-1][np.newaxis]), axis=0)
+    # the last acceleration is the same as the second last
+    accelerations[-1] = accelerations[-2]
+    accelerations = np.concatenate((accelerations, accelerations[-2][np.newaxis]), axis=0)
     
     return trajectory_points, velocities, accelerations
 
