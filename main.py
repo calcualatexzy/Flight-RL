@@ -53,7 +53,12 @@ def retrain():
     try:
         log_dir = "logs/"
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        env = FlightEnv()
+
+        num_envs = 4
+        multiprocessing.freeze_support()
+        env = SubprocVecEnv([lambda: FlightEnv() for _ in range(num_envs)])
+        env = VecMonitor(env)
+        # env = FlightEnv()
         model = PPO.load("QuadrotorPPO", env=env, device=device)
         env.reset()
 
