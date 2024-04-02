@@ -78,7 +78,7 @@ def generate_trajectory(episode_len_sec, sample_time, average_speed):
     control_points = np.random.uniform(low=0, high=max_position, size=(control_points_num, 3))
     # start and end points
     control_points[0] = [0, 0, 0.5]
-    control_points[-1] = [max_position, max_position, 2.5]
+    control_points[-1] = [max_position, max_position, 1.5]
     eval_points = int(episode_len_sec / sample_time)
     trajectory_points, velocities, accelerations = trajectory(control_points, eval_points, episode_len_sec)
 
@@ -111,7 +111,7 @@ def plot_trajectory(trajectory_points, velocities, accelerations):
 
 def save_trajectory(cnt, trajectory_points, velocities, accelerations):
     # Save the trajectory points, velocities, and accelerations to a file, reading them back in dictionary format
-    np.savez(f'FlightEnv/TrajLib/traj_50Hz_len10_vel1/{cnt}.npz', trajectory_points=trajectory_points, velocities=velocities, accelerations=accelerations)
+    np.savez(f'FlightEnv/TrajLib/traj_50Hz_len10_vel0.4/{cnt}.npz', trajectory_points=trajectory_points, velocities=velocities, accelerations=accelerations)
 
 def load_trajectory(episode_len_sec, sample_time, average_speed):
     # from the episode length and sample time, get the folder name
@@ -128,7 +128,7 @@ def load_trajectory(episode_len_sec, sample_time, average_speed):
 if __name__ == "__main__":
     episode_len_sec = 10
     sample_time = 0.02
-    average_speed = 1
+    average_speed = 0.4
 
     # start_time = time.time()
     for i in range(100):

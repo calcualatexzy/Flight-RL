@@ -40,15 +40,35 @@ def load():
         obs, rewards, dones, truncated, info = env.step(action)
         env.render()
     
+def retrain():
+    try:
+        log_dir = "logs/"
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        env = FlightEnv()
+        model = PPO.load("QuadrotorPPO", env=env, device=device)
+        env.reset()
 
+        checkpoint_callback = CheckpointCallback(save_freq=1e6, save_path="temp_checkpoints", name_prefix="QuadrotorPPO")
+
+        model.learn(total_timesteps=13*1e6, reset_num_timesteps=False, tb_log_name="ppo_flight_env", callback=checkpoint_callback)
+    except KeyboardInterrupt:
+        print("Training interrupted, saving model...")
+    finally:
+        model.save("QuadrotorPPO")
+        print("Model saved.")
+    model.save("QuadrotorPPO")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--train", action="store_true")
     parser.add_argument("--load", action="store_true")
+    parser.add_argument("--retrain", action="store_true")   
     args = parser.parse_args()
 
     if args.train:
         train()
     elif args.load:
         load()
+    elif args.retrain:
+        retrain()
+    

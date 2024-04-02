@@ -43,7 +43,7 @@ class FlightEnv(gym.Env):
                  reward_constraint_pos_radius=0.5,
                  reward_constraint_pos_penalty=1.0,
                  reward_exponential=True,
-                 goal_horizon=10,
+                 goal_horizon=50,
                  episode_len_sec=10,
                  ctrl_freq = 50,
                  pybullet_freq = 240,
@@ -135,10 +135,10 @@ class FlightEnv(gym.Env):
         add velocity and acceleration bounds.
         """ 
         # return generate_trajectory(episode_len_sec=episode_len_sec, sample_time=sample_time)
-        # return generate_line(episode_len_sec=episode_len_sec, sample_time=sample_time)
-        average_speed = 1
-        pos, vel, _ = load_trajectory(episode_len_sec=episode_len_sec, sample_time=sample_time, average_speed=average_speed)
-        return pos, vel
+        return generate_line(episode_len_sec=episode_len_sec, sample_time=sample_time)
+        # average_speed = 0.4
+        # pos, vel, _ = load_trajectory(episode_len_sec=episode_len_sec, sample_time=sample_time, average_speed=average_speed)
+        # return pos, vel
 
     def reset(self, seed=None, options=None):
         pybullet.configureDebugVisualizer(pybullet.COV_ENABLE_RENDERING, 0, physicsClientId=self.PYB_CLIENT)        
