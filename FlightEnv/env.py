@@ -136,7 +136,11 @@ class FlightEnv(gym.Env):
         """ 
         # return generate_trajectory(episode_len_sec=episode_len_sec, sample_time=sample_time)
         return generate_line(episode_len_sec=episode_len_sec, sample_time=sample_time)
+<<<<<<< HEAD
         # average_speed = 0.4
+=======
+        # average_speed = 1
+>>>>>>> 739ac9128338e5bff2a81786ff33e68e543e7eb2
         # pos, vel, _ = load_trajectory(episode_len_sec=episode_len_sec, sample_time=sample_time, average_speed=average_speed)
         # return pos, vel
 
