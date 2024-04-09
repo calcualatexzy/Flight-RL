@@ -14,7 +14,7 @@ def train():
         log_dir = "logs/"
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-        num_envs = 4
+        num_envs = 16
         multiprocessing.freeze_support()
         env = SubprocVecEnv([lambda: FlightEnv() for _ in range(num_envs)])
         env = VecMonitor(env)
@@ -23,7 +23,7 @@ def train():
             activation_fn=torch.nn.ReLU,
             net_arch=dict(pi=[256, 128], vf=[256, 128]))
         model = PPO("MlpPolicy", env,
-                learning_rate=1e-4,
+                learning_rate=1e-3,
                 ent_coef=0.01,
                 policy_kwargs=policy_kargs, 
                 tensorboard_log=log_dir, verbose=1,
@@ -31,7 +31,7 @@ def train():
     # need to add entropy coefficient -> force the agent to explore 0.01 -> track KL divergence, too high means overexploration
         checkpoint_callback = CheckpointCallback(save_freq=1e6, save_path="temp_checkpoints", name_prefix="QuadrotorPPO")
     
-        model.learn(total_timesteps=13*1e6, reset_num_timesteps=True, tb_log_name="ppo_flight_env", callback=checkpoint_callback)
+        model.learn(total_timesteps=40*1e6, reset_num_timesteps=True, tb_log_name="ppo_flight_env", callback=checkpoint_callback)
     except KeyboardInterrupt:
         print("Training interrupted, saving model...")
     finally:
@@ -44,9 +44,10 @@ def load():
     env = FlightEnv(render=True)
     obs, _ = env.reset()
     
-    for _ in range(1000):
+    done = False
+    while not done:
         action, _states = model.predict(obs)
-        obs, rewards, dones, truncated, info = env.step(action)
+        obs, rewards, done, truncated, info = env.step(action)
         env.render()
     
 def retrain():
@@ -54,7 +55,7 @@ def retrain():
         log_dir = "logs/"
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-        num_envs = 4
+        num_envs = 16
         multiprocessing.freeze_support()
         env = SubprocVecEnv([lambda: FlightEnv() for _ in range(num_envs)])
         env = VecMonitor(env)

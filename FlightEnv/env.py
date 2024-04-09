@@ -11,6 +11,7 @@ import xml.etree.ElementTree as etxml
 import math
 from copy import deepcopy
 import time
+import matplotlib.pyplot as plt
 
 from FlightEnv.quadrotor import Quadrotor
 from FlightEnv.gen_traj import generate_trajectory
@@ -36,14 +37,15 @@ class FlightEnv(gym.Env):
                  hard_reset=True,
                  # reward_state_weight should be a diagonal matrix
                  reward_state_pos_weight=1.0,
-                 reward_state_vel_weight=0.01,
-                 reward_state_attitude_weight=0.5,
+                 reward_state_vel_weight=0.1,
+                 reward_state_attitude_weight=0.01,
                  reward_state_ang_vel_weight=0.01,
-                 reward_action_weight=0.0001,
+                 reward_action_weight=0.001,
                  reward_constraint_pos_radius=0.5,
                  reward_constraint_pos_penalty=1.0,
                  reward_exponential=True,
                  goal_horizon=50,
+                 last_horizon=10,
                  episode_len_sec=10,
                  ctrl_freq = 100,
                  pybullet_freq = 240,
@@ -82,11 +84,15 @@ class FlightEnv(gym.Env):
 
         # Set the goal horizon.
         self._goal_horizon = goal_horizon
+        self._last_horizon = last_horizon
         self._episode_len_sec = episode_len_sec
 
         self.action_dim = 4
         self.state_dim = 12
         self.observation_dim = 12 * (1 + self._goal_horizon)
+
+        if self._last_horizon > 0:
+            self._last_state_queue = np.zeros((self._last_horizon, self.state_dim))
 
         seed = self.seed()
         self.reset(seed=seed)
@@ -117,13 +123,14 @@ class FlightEnv(gym.Env):
         self._state_space_low = observation_low
         self._state_space_high = observation_high
 
-        if self._goal_horizon > 0:
-            mul = 1 + self._goal_horizon
-            observation_low = np.concatenate([observation_low] * mul)
-            observation_high = np.concatenate([observation_high] * mul)
+        mul = 1 + self._goal_horizon + self._last_horizon
+        observation_low = np.concatenate([observation_low] * mul)
+        observation_high = np.concatenate([observation_high] * mul)
+
 
         self.observation_space = gym.spaces.Box(low=observation_low, high=observation_high, dtype=np.float32)
         self._observation = np.zeros(self.observation_dim)
+        
         self._norm_observation = np.zeros(self.observation_dim)
 
         self._hard_reset = hard_reset
@@ -186,8 +193,8 @@ class FlightEnv(gym.Env):
 
         if self._hard_reset:
             if self._is_render:
-                # User debug draw failed
                 self._debug_line()
+                self._debug_state = np.array([]).reshape(0, self.state_dim)
                 
 
         return self._get_observation(), self._get_info()
@@ -216,6 +223,8 @@ class FlightEnv(gym.Env):
         terminated = self._get_ternimated()
         info = self._get_info()
         truncated = False
+        if self._is_render:
+            self._debug_state = np.append(self._debug_state, self._state)
         return obs, reward, terminated, truncated, info
 
     def render(self, mode="rgb_array", close=False):
@@ -256,6 +265,7 @@ class FlightEnv(gym.Env):
                                             [self.state_goal[i+1, 0], self.state_goal[i+1, 2], self.state_goal[i+1, 4]],
                                             lineColorRGB=[1, 0, 0], lineWidth=1,
                                             physicsClientId=self.PYB_CLIENT)
+        # plot the goal trajectory in matplotlib
 
     def _get_observation(self):
         R_wb = np.array(pybullet.getMatrixFromQuaternion(self.quadrotor.quat)).reshape(3, 3)
@@ -275,7 +285,13 @@ class FlightEnv(gym.Env):
             goal_state = self.state_goal[wp_idx].flatten()
             obs = np.concatenate([obs, goal_state])
 
-        self._observation = obs
+        if self._last_horizon > 0:
+            last_state = self._last_state_queue[-self._last_horizon:].flatten()
+            obs = np.concatenate([last_state, obs])
+
+        self._last_state_queue = np.roll(self._last_state_queue, -1, axis=0)
+        self._last_state_queue[-1] = self._state
+
         return obs
 
     def _get_reward(self, raw_action):
@@ -283,6 +299,9 @@ class FlightEnv(gym.Env):
         action_error = action - self.action_goal
         wp_idx = min(self._env_step_counter, self.state_goal.shape[0] - 1)
         state_error = self._state - self.state_goal[wp_idx]
+        # print("step: ", self._env_step_counter)
+        # print("state: ", self._state)
+        # print("goal: ", self.state_goal[wp_idx])
         dist = np.sum(state_error @ self._reward_state_Q @ state_error) + self._reward_action_weight * np.sum(action_error**2)
         reward = -dist
         # constraint penalty
@@ -292,8 +311,8 @@ class FlightEnv(gym.Env):
         last_goal_pos = np.array([self.state_goal[wp_idx - 1, 0], self.state_goal[wp_idx - 1, 2], self.state_goal[wp_idx - 1, 4]])
         adj_pos = np.linalg.norm(last_goal_pos - goal_pos)
         self.reward_constraint_pos_radius = max(self.reward_constraint_pos_radius, adj_pos * self._goal_horizon * 2)
-        if np.linalg.norm(pos - goal_pos) > self.reward_constraint_pos_radius:
-            reward -= self.reward_constraint_pos_penalty
+        # if np.linalg.norm(pos - goal_pos) > self.reward_constraint_pos_radius:
+        #     reward -= self.reward_constraint_pos_penalty
             
         if self._reward_exponential:
             reward = np.exp(reward)
@@ -316,6 +335,21 @@ class FlightEnv(gym.Env):
             if not terminated:
                 self._out_of_bounds = False
             terminated = True
+        if terminated and self._is_render:
+            self._debug_fig = plt.figure()
+            ax = self._debug_fig.add_subplot(111, projection='3d')
+            ax.plot(self.state_goal[:, 0], self.state_goal[:, 2], self.state_goal[:, 4], label='Trajectory')
+            ax.set_xlabel('X')
+            ax.set_ylabel('Y')
+            ax.set_zlabel('Z')
+            ax.legend()
+
+            # plot state trajectory
+            state_traj = np.array(self._debug_state).reshape(-1, self.state_dim)
+            ax.plot(state_traj[:, 0], state_traj[:, 2], state_traj[:, 4], label='State Trajectory')
+            ax.legend()
+            plt.show()
+
         return terminated
     
     def seed(self, seed=None):
