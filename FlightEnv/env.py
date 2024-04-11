@@ -1,3 +1,4 @@
+
 import pybullet
 import pybullet_data
 
@@ -15,7 +16,7 @@ import matplotlib.pyplot as plt
 
 from FlightEnv.quadrotor import Quadrotor
 from FlightEnv.gen_traj import generate_trajectory
-from FlightEnv.gen_line import generate_line
+from FlightEnv.gen_line import generate_line, generate_uniform_line
 from FlightEnv.optim_gen_traj import load_trajectory
 
 class Physics(str, Enum):
@@ -142,7 +143,8 @@ class FlightEnv(gym.Env):
         add velocity and acceleration bounds.
         """ 
         # return generate_trajectory(episode_len_sec=episode_len_sec, sample_time=sample_time)
-        return generate_line(episode_len_sec=episode_len_sec, sample_time=sample_time)
+        # return generate_line(episode_len_sec=episode_len_sec, sample_time=sample_time)
+        return generate_uniform_line(episode_len_sec=episode_len_sec, sample_time=sample_time)
         # average_speed = 0.4
         # pos, vel, acc = load_trajectory(episode_len_sec=episode_len_sec, sample_time=sample_time, average_speed=average_speed)
         # return pos, vel, acc
@@ -171,7 +173,7 @@ class FlightEnv(gym.Env):
         pybullet.configureDebugVisualizer(pybullet.COV_ENABLE_RENDERING, 1, physicsClientId=self.PYB_CLIENT)  
         
         # Set goal state and action
-        pos_ref, vel_ref, acc_ref = self._generate_trajectory(self._episode_len_sec, self._time_step)
+        pos_ref, vel_ref, acc_ref, euler_ref = self._generate_trajectory(self._episode_len_sec, self._time_step)
         self.state_goal = np.vstack([
             pos_ref[:, 0],
             vel_ref[:, 0],
@@ -179,9 +181,9 @@ class FlightEnv(gym.Env):
             vel_ref[:, 1],
             pos_ref[:, 2],
             vel_ref[:, 2],
-            np.zeros(pos_ref.shape[0]),
-            np.zeros(pos_ref.shape[0]),
-            np.zeros(pos_ref.shape[0]),
+            euler_ref[:, 0],
+            euler_ref[:, 1],
+            euler_ref[:, 2],
             np.zeros(vel_ref.shape[0]),
             np.zeros(vel_ref.shape[0]),
             np.zeros(vel_ref.shape[0])
@@ -195,6 +197,7 @@ class FlightEnv(gym.Env):
             if self._is_render:
                 self._debug_line()
                 self._debug_state = np.array([]).reshape(0, self.state_dim)
+                self._debug_reward = []
                 
 
         return self._get_observation(), self._get_info()
@@ -214,6 +217,7 @@ class FlightEnv(gym.Env):
         if self._env_step_counter == 0:
             action = self.action_goal
         raw_action = action
+        # action = np.ones(self.action_dim) * self.quadrotor.MASS * self.GRAVITY_ACC / self.action_dim
         rpm = self._preprocess_action(action)
         self.quadrotor.step(rpm)
         self._env_step_counter += 1
@@ -225,6 +229,7 @@ class FlightEnv(gym.Env):
         truncated = False
         if self._is_render:
             self._debug_state = np.append(self._debug_state, self._state)
+            self._debug_reward.append(reward)
         return obs, reward, terminated, truncated, info
 
     def render(self, mode="rgb_array", close=False):
@@ -311,9 +316,10 @@ class FlightEnv(gym.Env):
         last_goal_pos = np.array([self.state_goal[wp_idx - 1, 0], self.state_goal[wp_idx - 1, 2], self.state_goal[wp_idx - 1, 4]])
         adj_pos = np.linalg.norm(last_goal_pos - goal_pos)
         self.reward_constraint_pos_radius = max(self.reward_constraint_pos_radius, adj_pos * self._goal_horizon * 2)
-        # if np.linalg.norm(pos - goal_pos) > self.reward_constraint_pos_radius:
-        #     reward -= self.reward_constraint_pos_penalty
+        if np.linalg.norm(pos - goal_pos) > self.reward_constraint_pos_radius:
+            reward -= self.reward_constraint_pos_penalty
             
+        # add velocity direction
         if self._reward_exponential:
             reward = np.exp(reward)
         return reward
@@ -348,6 +354,11 @@ class FlightEnv(gym.Env):
             state_traj = np.array(self._debug_state).reshape(-1, self.state_dim)
             ax.plot(state_traj[:, 0], state_traj[:, 2], state_traj[:, 4], label='State Trajectory')
             ax.legend()
+
+            # plot reward with env step
+            plt.plot(self._debug_reward)
+            plt.xlabel('Env Step')
+            plt.ylabel('Reward')
             plt.show()
 
         return terminated
