@@ -16,7 +16,7 @@ import matplotlib.pyplot as plt
 
 from FlightEnv.quadrotor import Quadrotor
 from FlightEnv.gen_traj import generate_trajectory
-from FlightEnv.gen_line import generate_line, generate_uniform_line
+from FlightEnv.gen_line import generate_line, generate_uniform_line, generate_hover
 from FlightEnv.optim_gen_traj import load_trajectory
 
 class Physics(str, Enum):
@@ -38,18 +38,20 @@ class FlightEnv(gym.Env):
                  hard_reset=True,
                  # reward_state_weight should be a diagonal matrix
                  reward_state_pos_weight=1.0,
-                 reward_state_vel_weight=0.1,
-                 reward_state_attitude_weight=0.01,
+                 reward_state_vel_weight=0.0,
+                #  reward_state_vel_weight=0.01,
+                 reward_state_attitude_weight=0.5,
+                #  reward_state_ang_vel_weight=0.0,
                  reward_state_ang_vel_weight=0.01,
-                 reward_action_weight=0.001,
+                 reward_action_weight=0.0001,
                  reward_constraint_pos_radius=0.5,
                  reward_constraint_pos_penalty=1.0,
-                 reward_exponential=True,
-                 goal_horizon=50,
-                 last_horizon=10,
+                 reward_exponential=False,
+                 goal_horizon=5,
+                 last_horizon=1,
                  episode_len_sec=10,
-                 ctrl_freq = 100,
-                 pybullet_freq = 240,
+                 ctrl_freq = 50,
+                 pybullet_freq = 500,
                  physics: Physics = Physics.PYB,
                  drone_model ='cf2x',
                  flight_urdf_root="FlightEnv/assets"):
@@ -111,6 +113,7 @@ class FlightEnv(gym.Env):
         self._reward_exponential = reward_exponential
 
         # Action space: 4 motors thrusts 
+        # try normalizing action around hover thrust?
         action_low, action_high = self._set_action()
         self.action_bounds = np.array([action_low, action_high])
         self.action_space = gym.spaces.Box(low=action_low, high=action_high, dtype=np.float32)
@@ -119,6 +122,7 @@ class FlightEnv(gym.Env):
         # Observation space: 12 states * horizon = {x, x_dot, y, y_dot, z, z_dot, phi, theta, psi, p_body, q_body, r_body}        
         self._state = np.zeros(self.state_dim)
         self._pos_threshold = [15, 15, self.GROUND_PLANE_Z+15]
+        self._vel_threshold = [2, 2, 2]
         
         observation_low, observation_high = self._set_observation()
         self._state_space_low = observation_low
@@ -144,7 +148,8 @@ class FlightEnv(gym.Env):
         """ 
         # return generate_trajectory(episode_len_sec=episode_len_sec, sample_time=sample_time)
         # return generate_line(episode_len_sec=episode_len_sec, sample_time=sample_time)
-        return generate_uniform_line(episode_len_sec=episode_len_sec, sample_time=sample_time)
+        # return generate_uniform_line(episode_len_sec=episode_len_sec, sample_time=sample_time)
+        return generate_hover(episode_len_sec=episode_len_sec, sample_time=sample_time)
         # average_speed = 0.4
         # pos, vel, acc = load_trajectory(episode_len_sec=episode_len_sec, sample_time=sample_time, average_speed=average_speed)
         # return pos, vel, acc
@@ -195,7 +200,7 @@ class FlightEnv(gym.Env):
 
         if self._hard_reset:
             if self._is_render:
-                self._debug_line()
+                # self._debug_line()
                 self._debug_state = np.array([]).reshape(0, self.state_dim)
                 self._debug_reward = []
                 
@@ -214,8 +219,6 @@ class FlightEnv(gym.Env):
           done: Whether the episode has ended.
           info: A dictionary that stores diagnostic information.
         """
-        if self._env_step_counter == 0:
-            action = self.action_goal
         raw_action = action
         # action = np.ones(self.action_dim) * self.quadrotor.MASS * self.GRAVITY_ACC / self.action_dim
         rpm = self._preprocess_action(action)
@@ -225,6 +228,8 @@ class FlightEnv(gym.Env):
         obs = self._get_observation()
         reward = self._get_reward(raw_action)
         terminated = self._get_ternimated()
+        if self._out_of_bounds:
+            reward -= 1
         info = self._get_info()
         truncated = False
         if self._is_render:
@@ -266,10 +271,10 @@ class FlightEnv(gym.Env):
 
     def _debug_line(self):
         for i in range(self.state_goal.shape[0]-1):
-                    pybullet.addUserDebugLine([self.state_goal[i, 0], self.state_goal[i, 2], self.state_goal[i, 4]],
-                                            [self.state_goal[i+1, 0], self.state_goal[i+1, 2], self.state_goal[i+1, 4]],
-                                            lineColorRGB=[1, 0, 0], lineWidth=1,
-                                            physicsClientId=self.PYB_CLIENT)
+            pybullet.addUserDebugLine([self.state_goal[i, 0], self.state_goal[i, 2], self.state_goal[i, 4]],
+                                    [self.state_goal[i+1, 0], self.state_goal[i+1, 2], self.state_goal[i+1, 4]],
+                                    lineColorRGB=[1, 0, 0], lineWidth=1,
+                                    physicsClientId=self.PYB_CLIENT)
         # plot the goal trajectory in matplotlib
 
     def _get_observation(self):
@@ -316,8 +321,8 @@ class FlightEnv(gym.Env):
         last_goal_pos = np.array([self.state_goal[wp_idx - 1, 0], self.state_goal[wp_idx - 1, 2], self.state_goal[wp_idx - 1, 4]])
         adj_pos = np.linalg.norm(last_goal_pos - goal_pos)
         self.reward_constraint_pos_radius = max(self.reward_constraint_pos_radius, adj_pos * self._goal_horizon * 2)
-        if np.linalg.norm(pos - goal_pos) > self.reward_constraint_pos_radius:
-            reward -= self.reward_constraint_pos_penalty
+        # if np.linalg.norm(pos - goal_pos) > self.reward_constraint_pos_radius:
+        #     reward -= self.reward_constraint_pos_penalty
             
         # add velocity direction
         if self._reward_exponential:
@@ -354,6 +359,7 @@ class FlightEnv(gym.Env):
             state_traj = np.array(self._debug_state).reshape(-1, self.state_dim)
             ax.plot(state_traj[:, 0], state_traj[:, 2], state_traj[:, 4], label='State Trajectory')
             ax.legend()
+            plt.show()
 
             # plot reward with env step
             plt.plot(self._debug_reward)
@@ -394,22 +400,25 @@ class FlightEnv(gym.Env):
         x_threshold = self._pos_threshold[0]
         y_threshold = self._pos_threshold[1]
         z_threshold = self._pos_threshold[2]
+        vx_threshold = self._vel_threshold[0]
+        vy_threshold = self._vel_threshold[1]
+        vz_threshold = self._vel_threshold[2]
         phi_threshold_radians = 85 * math.pi / 180
         theta_threshold_radians = 85 * math.pi / 180
         psi_threshold_radians = 180 * math.pi / 180  # Do not bound yaw.
 
         observation_low = np.array([
-                -x_threshold, -np.finfo(np.float32).max,
-                -y_threshold, -np.finfo(np.float32).max,
-                self.GROUND_PLANE_Z, -np.finfo(np.float32).max,
+                -x_threshold, -vx_threshold,
+                -y_threshold, -vy_threshold,
+                self.GROUND_PLANE_Z, -vz_threshold,
                 -phi_threshold_radians, -theta_threshold_radians, -psi_threshold_radians,
                 -np.finfo(np.float32).max, -np.finfo(np.float32).max, -np.finfo(np.float32).max
             ])
         
         observation_high = np.array([
-                x_threshold, np.finfo(np.float32).max,
-                y_threshold, np.finfo(np.float32).max,
-                z_threshold, np.finfo(np.float32).max,
+                x_threshold, vx_threshold,
+                y_threshold, vy_threshold,
+                z_threshold, vz_threshold,
                 phi_threshold_radians, theta_threshold_radians, psi_threshold_radians,
                 np.finfo(np.float32).max, np.finfo(np.float32).max, np.finfo(np.float32).max
             ])

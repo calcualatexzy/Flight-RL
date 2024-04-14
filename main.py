@@ -21,9 +21,12 @@ def train():
         # env = FlightEnv()
         policy_kargs = dict(
             activation_fn=torch.nn.Tanh,
-            net_arch=dict(pi=[128, 128], vf=[128, 128]))
+            net_arch=dict(pi=[256, 128, 128], vf=[256, 128, 128])
+        )
+
         model = PPO("MlpPolicy", env,
-                learning_rate=2.5*1e-4,
+                batch_size=256,
+                learning_rate=1e-3,
                 ent_coef=0.01,
                 policy_kwargs=policy_kargs, 
                 tensorboard_log=log_dir, verbose=1,
@@ -31,7 +34,7 @@ def train():
     # need to add entropy coefficient -> force the agent to explore 0.01 -> track KL divergence, too high means overexploration
         checkpoint_callback = CheckpointCallback(save_freq=1e6, save_path="temp_checkpoints", name_prefix="QuadrotorPPO")
     
-        model.learn(total_timesteps=15*1e6, reset_num_timesteps=True, tb_log_name="ppo_flight_env", callback=checkpoint_callback)
+        model.learn(total_timesteps=18*1e6, reset_num_timesteps=True, tb_log_name="ppo_flight_env", callback=checkpoint_callback)
     except KeyboardInterrupt:
         print("Training interrupted, saving model...")
     finally:

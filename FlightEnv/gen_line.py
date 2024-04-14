@@ -24,14 +24,14 @@ def generate_line(episode_len_sec=10, sample_time=0.01):
 
 def generate_uniform_line(episode_len_sec=10, sample_time=0.01):
     start_pos = np.array([0, 0, 0.5])
-    end_pos = np.array([10, 10, 0.5])
+    end_pos = np.array([12, 12, 0.5])
 
     num_waypoints = int(episode_len_sec / sample_time)
 
     time = np.linspace(0, 1, num_waypoints)[:, np.newaxis]
     waypoints = start_pos + time * (end_pos - start_pos)
 
-    v = 10. / episode_len_sec
+    v = 12. / episode_len_sec
     v = np.ones(num_waypoints) * v
     velocities = np.column_stack((v, v, np.zeros_like(v)))
     accelerations = np.zeros_like(velocities)
@@ -39,6 +39,23 @@ def generate_uniform_line(episode_len_sec=10, sample_time=0.01):
     eulers = np.tile(e, (num_waypoints, 1))
     
     return waypoints, velocities, accelerations, eulers
+
+def generate_hover(episode_len_sec=10, sample_time=0.01):
+    p_init = np.array([0, 0, 0.5])
+    v_init = np.array([0, 0, 0])
+    a_init = np.array([0, 0, 0])
+    
+    num_waypoints = int(episode_len_sec / sample_time)
+
+    v_hover = np.tile(v_init, (num_waypoints, 1))
+    a_hover = np.tile(a_init, (num_waypoints, 1))
+    p_hover = np.tile(p_init, (num_waypoints, 1))
+
+    # Calculate Euler angles (assuming hovering)
+    eulers = np.zeros((num_waypoints, 3))
+
+    return p_hover, v_hover, a_hover, eulers
+
 
 if __name__ == "__main__":
     waypoints, velocities, accelerations, eulers = generate_uniform_line()
