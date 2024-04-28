@@ -37,11 +37,10 @@ class FlightEnv(gym.Env):
                  verbose=False, 
                  hard_reset=True,
                  # reward_state_weight should be a diagonal matrix
-                 reward_state_pos_weight=1.0,
-                 reward_state_vel_weight=0.0,
-                #  reward_state_vel_weight=0.01,
+                 reward_state_pos_xy_weight=1.0,
+                 reward_state_pos_z_weight=1.5,
+                 reward_state_vel_weight=0.01,
                  reward_state_attitude_weight=0.5,
-                #  reward_state_ang_vel_weight=0.0,
                  reward_state_ang_vel_weight=0.01,
                  reward_action_weight=0.0001,
                  reward_constraint_pos_radius=0.5,
@@ -101,8 +100,9 @@ class FlightEnv(gym.Env):
         self.reset(seed=seed)
 
         self._reward_state_Q = np.diag([
-            reward_state_pos_weight, reward_state_vel_weight, reward_state_pos_weight,
-            reward_state_vel_weight, reward_state_pos_weight, reward_state_vel_weight,
+            reward_state_pos_xy_weight, reward_state_vel_weight, 
+            reward_state_pos_xy_weight, reward_state_vel_weight, 
+            reward_state_pos_z_weight, reward_state_vel_weight,
             reward_state_attitude_weight, reward_state_attitude_weight, reward_state_attitude_weight,
             reward_state_ang_vel_weight, reward_state_ang_vel_weight, reward_state_ang_vel_weight
         ])
@@ -147,9 +147,9 @@ class FlightEnv(gym.Env):
         add velocity and acceleration bounds.
         """ 
         # return generate_trajectory(episode_len_sec=episode_len_sec, sample_time=sample_time)
-        # return generate_line(episode_len_sec=episode_len_sec, sample_time=sample_time)
+        return generate_line(episode_len_sec=episode_len_sec, sample_time=sample_time)
         # return generate_uniform_line(episode_len_sec=episode_len_sec, sample_time=sample_time)
-        return generate_hover(episode_len_sec=episode_len_sec, sample_time=sample_time)
+        # return generate_hover(episode_len_sec=episode_len_sec, sample_time=sample_time)
         # average_speed = 0.4
         # pos, vel, acc = load_trajectory(episode_len_sec=episode_len_sec, sample_time=sample_time, average_speed=average_speed)
         # return pos, vel, acc
@@ -229,12 +229,13 @@ class FlightEnv(gym.Env):
         reward = self._get_reward(raw_action)
         terminated = self._get_ternimated()
         if self._out_of_bounds:
-            reward -= 1
+            reward -= 100
         info = self._get_info()
         truncated = False
         if self._is_render:
             self._debug_state = np.append(self._debug_state, self._state)
             self._debug_reward.append(reward)
+        # print("reward: ", reward)
         return obs, reward, terminated, truncated, info
 
     def render(self, mode="rgb_array", close=False):

@@ -7,7 +7,7 @@ def generate_line(episode_len_sec=10, sample_time=0.01):
 
     num_waypoints = int(episode_len_sec / sample_time)
 
-    max_vel = 2 * np.linalg.norm(end_pos - start_pos) / episode_len_sec
+    max_vel = 2 / episode_len_sec
     vel = np.linspace(0, max_vel, num_waypoints // 2)
     vel = np.concatenate((vel, vel[::-1]))
 
@@ -19,8 +19,10 @@ def generate_line(episode_len_sec=10, sample_time=0.01):
 
     velocities = np.column_stack((vel, vel, np.zeros_like(vel)))
     accelerations = np.column_stack((acc, acc, np.zeros_like(acc)))
+
+    eulers = np.zeros((num_waypoints, 3))
     
-    return waypoints, velocities, accelerations
+    return waypoints, velocities, accelerations, eulers
 
 def generate_uniform_line(episode_len_sec=10, sample_time=0.01):
     start_pos = np.array([0, 0, 0.5])
@@ -35,8 +37,9 @@ def generate_uniform_line(episode_len_sec=10, sample_time=0.01):
     v = np.ones(num_waypoints) * v
     velocities = np.column_stack((v, v, np.zeros_like(v)))
     accelerations = np.zeros_like(velocities)
-    e = np.array([0, 0, -0.7853982])
-    eulers = np.tile(e, (num_waypoints, 1))
+    # e = np.array([0, 0, -0.7853982])
+    # eulers = np.tile(e, (num_waypoints, 1))
+    eulers = np.zeros((num_waypoints, 3))
     
     return waypoints, velocities, accelerations, eulers
 
