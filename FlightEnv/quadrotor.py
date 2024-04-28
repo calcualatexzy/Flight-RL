@@ -18,7 +18,7 @@ class Quadrotor:
         self.STATE_UNITS = ['m', 'm/s', 'm', 'm/s', 'm', 'm/s',
                                 'rad', 'rad', 'rad', 'rad/s', 'rad/s', 'rad/s']
         
-        self.INIT_XYZ = np.array([-0.1, 0.2, 0.3])
+        self.INIT_XYZ = np.array([0.5, 0, 0.5])
         self.INIT_VEL = np.array([0, 0, 0])
         self.INIT_ANG_VEL = np.array([0, 0, 0])
         self.INIT_RPY = np.array([0, 0, 0])
@@ -78,7 +78,6 @@ class Quadrotor:
                                  posObj=[0, 0, 0],
                                  flags=pybullet.LINK_FRAME,
                                  physicsClientId=self.PYB_CLIENT)
-        
         pybullet.applyExternalTorque(self.my_quadrotor,
                               4,
                               torqueObj=[0, 0, z_torque],

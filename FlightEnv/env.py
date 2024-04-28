@@ -101,8 +101,8 @@ class FlightEnv(gym.Env):
         self.reset(seed=seed)
 
         self._reward_state_Q = np.diag([
-            reward_state_pos_weight, reward_state_pos_weight, reward_state_pos_weight,
-            reward_state_vel_weight, reward_state_vel_weight, reward_state_vel_weight,
+            reward_state_pos_weight, reward_state_vel_weight, reward_state_pos_weight,
+            reward_state_vel_weight, reward_state_pos_weight, reward_state_vel_weight,
             reward_state_attitude_weight, reward_state_attitude_weight, reward_state_attitude_weight,
             reward_state_ang_vel_weight, reward_state_ang_vel_weight, reward_state_ang_vel_weight
         ])
