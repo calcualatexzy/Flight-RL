@@ -78,9 +78,11 @@ def generate_trajectory(episode_len_sec, sample_time, average_speed):
     # Example control points
     control_points_num = 4
     control_points = np.random.uniform(low=0, high=max_position, size=(control_points_num, 3))
+    # generate random ending point
     # start and end points
     control_points[0] = [0, 0, 0.5]
-    control_points[-1] = [max_position, max_position, 0.8]
+    # control_points[-1] = [max_position, max_position, 0.8]
+    control_points[-1] = [np.random.uniform(low=-max_position, high=max_position), np.random.uniform(low=-max_position, high=max_position), np.random.uniform(low=0.3, high=0.7)]
     eval_points = int(episode_len_sec / sample_time)
     trajectory_points, velocities, accelerations = trajectory(control_points, eval_points, episode_len_sec)
 
