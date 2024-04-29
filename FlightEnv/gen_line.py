@@ -1,13 +1,13 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
-def generate_line(episode_len_sec=10, sample_time=0.01):
+def generate_line(episode_len_sec=5, sample_time=0.005):
     start_pos = np.array([0, 0, 0.5])
     end_pos = np.array([2, 2, 0.5])
 
     num_waypoints = int(episode_len_sec / sample_time)
 
-    max_vel = 2 / episode_len_sec
+    max_vel = 2. * 2. / episode_len_sec
     vel = np.linspace(0, max_vel, num_waypoints // 2)
     vel = np.concatenate((vel, vel[::-1]))
 
@@ -21,19 +21,22 @@ def generate_line(episode_len_sec=10, sample_time=0.01):
     accelerations = np.column_stack((acc, acc, np.zeros_like(acc)))
 
     eulers = np.zeros((num_waypoints, 3))
-    
+    # print("waypoints: ", waypoints.shape)
+    # print("velocities: ", velocities.shape)
+    # print("accelerations: ", accelerations.shape)
+
     return waypoints, velocities, accelerations, eulers
 
 def generate_uniform_line(episode_len_sec=10, sample_time=0.01):
     start_pos = np.array([0, 0, 0.5])
-    end_pos = np.array([12, 12, 0.5])
+    end_pos = np.array([2, 2, 0.5])
 
     num_waypoints = int(episode_len_sec / sample_time)
 
     time = np.linspace(0, 1, num_waypoints)[:, np.newaxis]
     waypoints = start_pos + time * (end_pos - start_pos)
 
-    v = 12. / episode_len_sec
+    v = 2. / episode_len_sec
     v = np.ones(num_waypoints) * v
     velocities = np.column_stack((v, v, np.zeros_like(v)))
     accelerations = np.zeros_like(velocities)

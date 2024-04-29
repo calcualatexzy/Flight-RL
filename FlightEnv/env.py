@@ -38,8 +38,8 @@ class FlightEnv(gym.Env):
                  hard_reset=True,
                  # reward_state_weight should be a diagonal matrix
                  reward_state_pos_xy_weight=1.0,
-                 reward_state_pos_z_weight=1.5,
-                 reward_state_vel_weight=0.01,
+                 reward_state_pos_z_weight=1.0,
+                 reward_state_vel_weight=0.1,
                  reward_state_attitude_weight=0.5,
                  reward_state_ang_vel_weight=0.01,
                  reward_action_weight=0.0001,
@@ -48,9 +48,9 @@ class FlightEnv(gym.Env):
                  reward_exponential=False,
                  goal_horizon=5,
                  last_horizon=1,
-                 episode_len_sec=10,
-                 ctrl_freq = 50,
-                 pybullet_freq = 500,
+                 episode_len_sec=5,
+                 ctrl_freq = 200,
+                 pybullet_freq = 600,
                  physics: Physics = Physics.PYB,
                  drone_model ='cf2x',
                  flight_urdf_root="FlightEnv/assets"):
@@ -76,6 +76,7 @@ class FlightEnv(gym.Env):
         self._physics = Physics(physics)
         self._time_step = 1. / ctrl_freq
         self._pybullet_time_step = 1. / pybullet_freq
+        self._pybullet_steps_per_ctrl = int(pybullet_freq / ctrl_freq)
 
         if self._is_render:
             self.PYB_CLIENT = pybullet.connect(pybullet.GUI)
@@ -147,12 +148,12 @@ class FlightEnv(gym.Env):
         add velocity and acceleration bounds.
         """ 
         # return generate_trajectory(episode_len_sec=episode_len_sec, sample_time=sample_time)
-        return generate_line(episode_len_sec=episode_len_sec, sample_time=sample_time)
+        # return generate_line(episode_len_sec=episode_len_sec, sample_time=sample_time)
         # return generate_uniform_line(episode_len_sec=episode_len_sec, sample_time=sample_time)
         # return generate_hover(episode_len_sec=episode_len_sec, sample_time=sample_time)
-        # average_speed = 0.4
-        # pos, vel, acc = load_trajectory(episode_len_sec=episode_len_sec, sample_time=sample_time, average_speed=average_speed)
-        # return pos, vel, acc
+        average_speed = 0.4
+        pos, vel, acc = load_trajectory(episode_len_sec=episode_len_sec, sample_time=sample_time, average_speed=average_speed)
+        return pos, vel, acc
 
     def reset(self, seed=None, options=None):
         pybullet.configureDebugVisualizer(pybullet.COV_ENABLE_RENDERING, 0, physicsClientId=self.PYB_CLIENT)        
@@ -165,7 +166,7 @@ class FlightEnv(gym.Env):
                                                 , physicsClientId=self.PYB_CLIENT)
 
             self.quadrotor = Quadrotor(pybullet_client=self.PYB_CLIENT, urdf_path=self._urdf_path
-                                       , time_step=self._time_step, verbose=self._verbose)
+                                       , pybullet_steps_per_ctrl=self._pybullet_steps_per_ctrl, verbose=self._verbose)
             
             
             self.quadrotor.load_model_param()
@@ -178,7 +179,7 @@ class FlightEnv(gym.Env):
         pybullet.configureDebugVisualizer(pybullet.COV_ENABLE_RENDERING, 1, physicsClientId=self.PYB_CLIENT)  
         
         # Set goal state and action
-        pos_ref, vel_ref, acc_ref, euler_ref = self._generate_trajectory(self._episode_len_sec, self._time_step)
+        pos_ref, vel_ref, acc_ref = self._generate_trajectory(self._episode_len_sec, self._time_step)
         self.state_goal = np.vstack([
             pos_ref[:, 0],
             vel_ref[:, 0],
@@ -186,9 +187,9 @@ class FlightEnv(gym.Env):
             vel_ref[:, 1],
             pos_ref[:, 2],
             vel_ref[:, 2],
-            euler_ref[:, 0],
-            euler_ref[:, 1],
-            euler_ref[:, 2],
+            np.zeros(pos_ref.shape[0]),
+            np.zeros(pos_ref.shape[0]),
+            np.zeros(pos_ref.shape[0]),
             np.zeros(vel_ref.shape[0]),
             np.zeros(vel_ref.shape[0]),
             np.zeros(vel_ref.shape[0])
@@ -229,7 +230,7 @@ class FlightEnv(gym.Env):
         reward = self._get_reward(raw_action)
         terminated = self._get_ternimated()
         if self._out_of_bounds:
-            reward -= 100
+            reward -= 30
         info = self._get_info()
         truncated = False
         if self._is_render:
@@ -348,19 +349,28 @@ class FlightEnv(gym.Env):
                 self._out_of_bounds = False
             terminated = True
         if terminated and self._is_render:
-            self._debug_fig = plt.figure()
-            ax = self._debug_fig.add_subplot(111, projection='3d')
+            self._debug_fig, (ax, axv) = plt.subplots(1, 2, figsize=(12, 6), subplot_kw={'projection': '3d'})
+
+            # Plotting on the first subplot (ax)
             ax.plot(self.state_goal[:, 0], self.state_goal[:, 2], self.state_goal[:, 4], label='Trajectory')
+            state_traj = np.array(self._debug_state).reshape(-1, self.state_dim)
+            ax.plot(state_traj[:, 0], state_traj[:, 2], state_traj[:, 4], label='State Trajectory')
             ax.set_xlabel('X')
             ax.set_ylabel('Y')
             ax.set_zlabel('Z')
             ax.legend()
+            
+            # Plotting on the second subplot (axv)
+            # plot with (timestamp, vX, vY)
+            axv.plot(np.arange(len(self.state_goal)), self.state_goal[:, 1], self.state_goal[:, 3], label='Velocity')
+            axv.plot(np.arange(len(state_traj)), state_traj[:, 1], state_traj[:, 3], label='State Velocity')
+            axv.set_xlabel('step')
+            axv.set_ylabel('vX')
+            axv.set_zlabel('vY')
+            axv.legend()
 
-            # plot state trajectory
-            state_traj = np.array(self._debug_state).reshape(-1, self.state_dim)
-            ax.plot(state_traj[:, 0], state_traj[:, 2], state_traj[:, 4], label='State Trajectory')
-            ax.legend()
             plt.show()
+
 
             # plot reward with env step
             plt.plot(self._debug_reward)

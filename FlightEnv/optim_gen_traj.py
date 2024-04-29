@@ -76,11 +76,11 @@ def trajectory(control_points, eval_points, total_time):
 def generate_trajectory(episode_len_sec, sample_time, average_speed):
     max_position = episode_len_sec * average_speed
     # Example control points
-    control_points_num = 6
+    control_points_num = 4
     control_points = np.random.uniform(low=0, high=max_position, size=(control_points_num, 3))
     # start and end points
     control_points[0] = [0, 0, 0.5]
-    control_points[-1] = [max_position, max_position, 1.5]
+    control_points[-1] = [max_position, max_position, 0.8]
     eval_points = int(episode_len_sec / sample_time)
     trajectory_points, velocities, accelerations = trajectory(control_points, eval_points, episode_len_sec)
 
@@ -91,6 +91,7 @@ def plot_trajectory(trajectory_points, velocities, accelerations):
     fig = plt.figure()
     ax = fig.add_subplot(111, projection='3d')
     ax.plot(trajectory_points[:, 0], trajectory_points[:, 1], trajectory_points[:, 2], label='Trajectory')
+    ax.plot(trajectory_points[::20, 0], trajectory_points[::20, 1], trajectory_points[::20, 2], 'ro')
     ax.set_xlabel('X')
     ax.set_ylabel('Y')
     ax.set_zlabel('Z')
@@ -109,11 +110,12 @@ def plot_trajectory(trajectory_points, velocities, accelerations):
     ax.plot(accelerations[:, 1], label='Y Acceleration')
     ax.plot(accelerations[:, 2], label='Z Acceleration')
     ax.legend()
+
     plt.show()
 
 def save_trajectory(cnt, trajectory_points, velocities, accelerations):
     # Save the trajectory points, velocities, and accelerations to a file, reading them back in dictionary format
-    np.savez(f'FlightEnv/TrajLib/traj_50Hz_len10_vel0.4/{cnt}.npz', trajectory_points=trajectory_points, velocities=velocities, accelerations=accelerations)
+    np.savez(f'FlightEnv/TrajLib/traj_200Hz_len5_vel0.4/{cnt}.npz', trajectory_points=trajectory_points, velocities=velocities, accelerations=accelerations)
 
 def load_trajectory(episode_len_sec, sample_time, average_speed):
     # from the episode length and sample time, get the folder name
@@ -121,6 +123,7 @@ def load_trajectory(episode_len_sec, sample_time, average_speed):
     folder_name = f'FlightEnv/TrajLib/traj_{freq}Hz_len{episode_len_sec}_vel{average_speed}/'
     num_files = 100
     file_num = np.random.randint(num_files)
+    # file_num = 0
     data = np.load(f'{folder_name}{file_num}.npz')
     trajectory_points = data['trajectory_points']
     velocities = data['velocities']
@@ -128,8 +131,8 @@ def load_trajectory(episode_len_sec, sample_time, average_speed):
     return trajectory_points, velocities, accelerations
 
 if __name__ == "__main__":
-    episode_len_sec = 10
-    sample_time = 0.02
+    episode_len_sec = 5
+    sample_time = 0.005
     average_speed = 0.4
 
     # start_time = time.time()
@@ -138,8 +141,7 @@ if __name__ == "__main__":
         save_trajectory(i, trajectory_points, velocities, accelerations)
     # print("Time taken: ", time.time() - start_time)
     # trajectory_points, velocities, accelerations = generate_trajectory(episode_len_sec, sample_time, average_speed)
-
-    # Plotting
+    # # Plotting
     # print(trajectory_points.shape, velocities.shape, accelerations.shape)
     # plot_trajectory(trajectory_points, velocities, accelerations)
 

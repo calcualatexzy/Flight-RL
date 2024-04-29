@@ -6,10 +6,10 @@ import math
 import pybullet
 
 class Quadrotor:
-    def __init__(self, pybullet_client, urdf_path, time_step, verbose=False):
+    def __init__(self, pybullet_client, urdf_path, pybullet_steps_per_ctrl, verbose=False):
         self.PYB_CLIENT = pybullet_client
         self._urdf_path = urdf_path
-        self._time_step = time_step
+        self._pybullet_steps_per_ctrl = pybullet_steps_per_ctrl
 
         self._verbose = verbose
         
@@ -56,8 +56,9 @@ class Quadrotor:
         self.last_clipped_action = np.zeros(4)
 
     def step(self, action):
-        self._physics(action)
-        pybullet.stepSimulation(physicsClientId=self.PYB_CLIENT)
+        for _ in range(self._pybullet_steps_per_ctrl):
+            self._physics(action)
+            pybullet.stepSimulation(physicsClientId=self.PYB_CLIENT)
         self._update_and_store_kinematic_information()
         self._step_counter += 1
 
