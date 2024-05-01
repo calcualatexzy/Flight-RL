@@ -70,7 +70,7 @@ def retrain():
 
         checkpoint_callback = CheckpointCallback(save_freq=1e6, save_path="temp_checkpoints", name_prefix="QuadrotorPPO")
 
-        model.learn(total_timesteps=13*1e6, reset_num_timesteps=False, tb_log_name="ppo_flight_env", callback=checkpoint_callback)
+        model.learn(total_timesteps=30*1e6, reset_num_timesteps=False, tb_log_name="ppo_flight_env", callback=checkpoint_callback)
     except KeyboardInterrupt:
         print("Training interrupted, saving model...")
     finally:

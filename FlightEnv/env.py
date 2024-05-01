@@ -37,12 +37,12 @@ class FlightEnv(gym.Env):
                  verbose=False, 
                  hard_reset=True,
                  # reward_state_weight should be a diagonal matrix
-                 reward_state_pos_xy_weight=1.0,
-                 reward_state_pos_z_weight=1.0,
-                 reward_state_vel_weight=0.1,
+                 reward_state_pos_xy_weight=1,
+                 reward_state_pos_z_weight=1,
+                 reward_state_vel_weight=0.3,
                  reward_state_attitude_weight=0.5,
                  reward_state_ang_vel_weight=0.01,
-                 reward_action_weight=0.0001,
+                 reward_action_weight=0.001,
                  reward_constraint_pos_radius=0.5,
                  reward_constraint_pos_penalty=1.0,
                  reward_exponential=False,
@@ -123,7 +123,7 @@ class FlightEnv(gym.Env):
         # Observation space: 12 states * horizon = {x, x_dot, y, y_dot, z, z_dot, phi, theta, psi, p_body, q_body, r_body}        
         self._state = np.zeros(self.state_dim)
         self._pos_threshold = [15, 15, self.GROUND_PLANE_Z+15]
-        self._vel_threshold = [2, 2, 2]
+        self._vel_threshold = [5, 5, 5]
         
         observation_low, observation_high = self._set_observation()
         self._state_space_low = observation_low
@@ -151,7 +151,7 @@ class FlightEnv(gym.Env):
         # return generate_line(episode_len_sec=episode_len_sec, sample_time=sample_time)
         # return generate_uniform_line(episode_len_sec=episode_len_sec, sample_time=sample_time)
         # return generate_hover(episode_len_sec=episode_len_sec, sample_time=sample_time)
-        average_speed = 0.4
+        average_speed = 1.5
         pos, vel, acc = load_trajectory(episode_len_sec=episode_len_sec, sample_time=sample_time, average_speed=average_speed)
         return pos, vel, acc
 

@@ -75,14 +75,21 @@ def trajectory(control_points, eval_points, total_time):
 
 def generate_trajectory(episode_len_sec, sample_time, average_speed):
     max_position = episode_len_sec * average_speed
+    min_position = 0.1
     # Example control points
-    control_points_num = 4
+    # TrajLib/traj_200Hz_len5_vel0.4: control_points_num = 4
+    # TrajLib/traj_200Hz_len5_vel1.5: control_points_num = 6
+    control_points_num = 6
     control_points = np.random.uniform(low=0, high=max_position, size=(control_points_num, 3))
     # generate random ending point
     # start and end points
     control_points[0] = [0, 0, 0.5]
     # control_points[-1] = [max_position, max_position, 0.8]
-    control_points[-1] = [np.random.uniform(low=-max_position, high=max_position), np.random.uniform(low=-max_position, high=max_position), np.random.uniform(low=0.3, high=0.7)]
+    control_points[-1] = [np.random.choice([np.random.uniform(-max_position, -min_position), np.random.uniform(min_position, max_position)]),
+                            np.random.choice([np.random.uniform(-max_position, -min_position), np.random.uniform(min_position, max_position)]),
+                            np.random.uniform(low=0.3, high=0.7)]
+    # control_points[-1] = [np.random.uniform(low=-max_position, high=max_position), np.random.uniform(low=-max_position, high=max_position), np.random.uniform(low=0.3, high=0.7)]
+    
     eval_points = int(episode_len_sec / sample_time)
     trajectory_points, velocities, accelerations = trajectory(control_points, eval_points, episode_len_sec)
 
@@ -117,7 +124,7 @@ def plot_trajectory(trajectory_points, velocities, accelerations):
 
 def save_trajectory(cnt, trajectory_points, velocities, accelerations):
     # Save the trajectory points, velocities, and accelerations to a file, reading them back in dictionary format
-    np.savez(f'FlightEnv/TrajLib/traj_200Hz_len5_vel0.4/{cnt}.npz', trajectory_points=trajectory_points, velocities=velocities, accelerations=accelerations)
+    np.savez(f'FlightEnv/TrajLib/traj_200Hz_len5_vel1.5/{cnt}.npz', trajectory_points=trajectory_points, velocities=velocities, accelerations=accelerations)
 
 def load_trajectory(episode_len_sec, sample_time, average_speed):
     # from the episode length and sample time, get the folder name
@@ -135,7 +142,7 @@ def load_trajectory(episode_len_sec, sample_time, average_speed):
 if __name__ == "__main__":
     episode_len_sec = 5
     sample_time = 0.005
-    average_speed = 0.4
+    average_speed = 1.5
 
     # start_time = time.time()
     for i in range(100):
