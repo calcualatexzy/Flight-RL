@@ -35,12 +35,13 @@ class Quadrotor:
         self.reset(reload_urdf=True)
 
     def reset(self, reload_urdf=True):
+        self.load_model_param()
         if reload_urdf:
             self.my_quadrotor = pybullet.loadURDF(self._urdf_path, self.INIT_XYZ, 
                                                   pybullet.getQuaternionFromEuler(self.INIT_RPY), 
                                                   physicsClientId=self.PYB_CLIENT)
 
-            pybullet.changeDynamics(self.my_quadrotor, -1, linearDamping=0, angularDamping=0)
+            pybullet.changeDynamics(self.my_quadrotor, -1, linearDamping=0, angularDamping=0, mass=self.MASS, localInertiaDiagonal=self.J.diagonal())
 
             self._update_and_store_kinematic_information()
         else:
@@ -127,7 +128,13 @@ class Quadrotor:
             self.PWM2RPM_CONST, \
             self.MIN_PWM, \
             self.MAX_PWM = self._parse_urdf_parameters(self._urdf_path)
-
+        print("扰动前m", self.MASS)
+        print("扰动前J", self.J)
+        # 添加随机扰动
+        self.MASS += np.random.uniform(0.005, 0.005)
+        self.J += np.random.uniform(-0.000005, 0.000005, size=self.J.shape)
+        print("扰动后m", self.MASS)
+        print("扰动后J", self.J)
         if self._verbose:
             print(
                 '[INFO] BaseAviary.__init__() loaded parameters from the drone\'s .urdf: \
@@ -194,3 +201,5 @@ class Quadrotor:
         return M, L, THRUST2WEIGHT_RATIO, J, J_INV, KF, KM, COLLISION_H, COLLISION_R, COLLISION_Z_OFFSET, MAX_SPEED_KMH, \
             GND_EFF_COEFF, PROP_RADIUS, DRAG_COEFF, DW_COEFF_1, DW_COEFF_2, DW_COEFF_3, \
             PWM2RPM_SCALE, PWM2RPM_CONST, MIN_PWM, MAX_PWM
+    
+    
