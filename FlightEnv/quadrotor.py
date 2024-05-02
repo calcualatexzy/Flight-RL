@@ -31,11 +31,13 @@ class Quadrotor:
         self.last_clipped_action = np.zeros(4)
 
         self._step_counter = 0
-
+        self.firsttime = True
         self.reset(reload_urdf=True)
 
     def reset(self, reload_urdf=True):
-        self.load_model_param()
+        if(self.firsttime):
+            self.load_model_param()
+            self.firsttime = False
         if reload_urdf:
             self.my_quadrotor = pybullet.loadURDF(self._urdf_path, self.INIT_XYZ, 
                                                   pybullet.getQuaternionFromEuler(self.INIT_RPY), 
@@ -128,13 +130,13 @@ class Quadrotor:
             self.PWM2RPM_CONST, \
             self.MIN_PWM, \
             self.MAX_PWM = self._parse_urdf_parameters(self._urdf_path)
-        print("扰动前m", self.MASS)
-        print("扰动前J", self.J)
+        #print("扰动前m", self.MASS)
+        #print("扰动前J", self.J)
         # 添加随机扰动
         self.MASS += np.random.uniform(-0.002, 0.002)
         self.J += np.random.uniform(-0.000005, 0.000005, size=self.J.shape)
-        print("扰动后m", self.MASS)
-        print("扰动后J", self.J)
+        #print("扰动后m", self.MASS)
+        #print("扰动后J", self.J)
         if self._verbose:
             print(
                 '[INFO] BaseAviary.__init__() loaded parameters from the drone\'s .urdf: \
