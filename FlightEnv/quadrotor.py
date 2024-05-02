@@ -131,7 +131,7 @@ class Quadrotor:
         print("扰动前m", self.MASS)
         print("扰动前J", self.J)
         # 添加随机扰动
-        self.MASS += np.random.uniform(0.005, 0.005)
+        self.MASS += np.random.uniform(-0.002, 0.002)
         self.J += np.random.uniform(-0.000005, 0.000005, size=self.J.shape)
         print("扰动后m", self.MASS)
         print("扰动后J", self.J)
