@@ -39,13 +39,14 @@ class FlightEnv(gym.Env):
                  # reward_state_weight should be a diagonal matrix
                  reward_state_pos_xy_weight=1,
                  reward_state_pos_z_weight=1,
-                 reward_state_vel_weight=0.3,
+                 reward_state_vel_weight=0.1,
                  reward_state_attitude_weight=0.5,
                  reward_state_ang_vel_weight=0.01,
                  reward_action_weight=0.001,
                  reward_constraint_pos_radius=0.5,
                  reward_constraint_pos_penalty=1.0,
                  reward_exponential=False,
+                 is_domain_randomization=True,
                  goal_horizon=5,
                  last_horizon=1,
                  episode_len_sec=5,
@@ -77,6 +78,8 @@ class FlightEnv(gym.Env):
         self._time_step = 1. / ctrl_freq
         self._pybullet_time_step = 1. / pybullet_freq
         self._pybullet_steps_per_ctrl = int(pybullet_freq / ctrl_freq)
+
+        self._is_domain_randomization = is_domain_randomization
 
         if self._is_render:
             self.PYB_CLIENT = pybullet.connect(pybullet.GUI)
@@ -165,12 +168,9 @@ class FlightEnv(gym.Env):
             self._ground_id = pybullet.loadURDF("%s/plane.urdf" % pybullet_data.getDataPath(), [0, 0, self.GROUND_PLANE_Z]
                                                 , physicsClientId=self.PYB_CLIENT)
 
-            self.quadrotor = Quadrotor(pybullet_client=self.PYB_CLIENT, urdf_path=self._urdf_path
-                                       , pybullet_steps_per_ctrl=self._pybullet_steps_per_ctrl, verbose=self._verbose)
-            
-            
-            self.quadrotor.load_model_param()
-
+            self.quadrotor = Quadrotor(pybullet_client=self.PYB_CLIENT, urdf_path=self._urdf_path,
+                                       pybullet_steps_per_ctrl=self._pybullet_steps_per_ctrl, 
+                                       is_domain_randomization=self._is_domain_randomization, verbose=self._verbose)
 
         self.quadrotor.reset(reload_urdf=False)
 
