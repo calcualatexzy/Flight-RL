@@ -5,13 +5,26 @@ import xml.etree.ElementTree as etxml
 import math
 import pybullet
 
+class Physics(str, Enum):
+    '''Physics implementations enumeration class.'''
+
+    PYB = 'pyb'  # Base PyBullet physics update.
+    DYN = 'dyn'  # Update with an explicit model of the dynamics.
+    PYB_GND = 'pyb_gnd'  # PyBullet physics update with ground effect.
+    PYB_DRAG = 'pyb_drag'  # PyBullet physics update with drag.
+    PYB_DW = 'pyb_dw'  # PyBullet physics update with downwash.
+    PYB_GND_DRAG_DW = 'pyb_gnd_drag_dw'  # PyBullet physics update with ground effect, drag, and downwash.
 class Quadrotor:
-    def __init__(self, pybullet_client, urdf_path, pybullet_steps_per_ctrl, is_domain_randomization=False, verbose=False):
+    def __init__(self, pybullet_client, urdf_path, pybullet_steps_per_ctrl, is_domain_randomization=False, 
+                 physics=Physics.PYB,
+                 verbose=False):
         self.PYB_CLIENT = pybullet_client
         self._urdf_path = urdf_path
         self._pybullet_steps_per_ctrl = pybullet_steps_per_ctrl
 
         self._verbose = verbose
+        
+        self._physics = physics
 
         self._is_domain_randomization = is_domain_randomization
         
@@ -36,7 +49,7 @@ class Quadrotor:
         self.rpy = np.zeros(3)
         self.vel = np.zeros(3)
         self.ang_vel = np.zeros(3)
-        self.last_clipped_action = np.zeros(4)
+        self.last_action = np.zeros(4)
 
         self._step_counter = 0
 
@@ -65,14 +78,18 @@ class Quadrotor:
             self._update_and_store_kinematic_information()
 
         self._step_counter = 0
-        self.last_clipped_action = np.zeros(4)
+        self.last_action = np.zeros(4)
 
     def step(self, action):
         for _ in range(self._pybullet_steps_per_ctrl):
             self._physics(action)
+            if self._physics == Physics.PYB_DRAG:
+                self._drag(action)
             pybullet.stepSimulation(physicsClientId=self.PYB_CLIENT)
+            self.last_action = action
         self._update_and_store_kinematic_information()
         self._step_counter += 1
+        
 
     def _physics(self, rpm):
         '''Base PyBullet physics implementation.

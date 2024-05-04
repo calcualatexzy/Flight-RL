@@ -14,21 +14,10 @@ from copy import deepcopy
 import time
 import matplotlib.pyplot as plt
 
-from FlightEnv.quadrotor import Quadrotor
+from FlightEnv.quadrotor import Quadrotor, Physics
 from FlightEnv.gen_traj import generate_trajectory
 from FlightEnv.gen_line import generate_line, generate_uniform_line, generate_hover
 from FlightEnv.optim_gen_traj import load_trajectory
-
-class Physics(str, Enum):
-    '''Physics implementations enumeration class.'''
-
-    PYB = 'pyb'  # Base PyBullet physics update.
-    DYN = 'dyn'  # Update with an explicit model of the dynamics.
-    PYB_GND = 'pyb_gnd'  # PyBullet physics update with ground effect.
-    PYB_DRAG = 'pyb_drag'  # PyBullet physics update with drag.
-    PYB_DW = 'pyb_dw'  # PyBullet physics update with downwash.
-    PYB_GND_DRAG_DW = 'pyb_gnd_drag_dw'  # PyBullet physics update with ground effect, drag, and downwash.
-
 
 class FlightEnv(gym.Env):
     metadata = {"render.modes": ["human", "rgb_array"], "video.frames_per_second": 100}
@@ -52,7 +41,7 @@ class FlightEnv(gym.Env):
                  episode_len_sec=5,
                  ctrl_freq = 200,
                  pybullet_freq = 600,
-                 physics: Physics = Physics.PYB,
+                 physics: Physics = Physics.PYB_DRAG,
                  drone_model ='cf2x',
                  flight_urdf_root="FlightEnv/assets"):
         super(FlightEnv, self).__init__()
@@ -170,7 +159,8 @@ class FlightEnv(gym.Env):
 
             self.quadrotor = Quadrotor(pybullet_client=self.PYB_CLIENT, urdf_path=self._urdf_path,
                                        pybullet_steps_per_ctrl=self._pybullet_steps_per_ctrl, 
-                                       is_domain_randomization=self._is_domain_randomization, verbose=self._verbose)
+                                       is_domain_randomization=self._is_domain_randomization, 
+                                       physics=Physics.PYB_DRAG, verbose=self._verbose)
 
         self.quadrotor.reset(reload_urdf=False)
 
