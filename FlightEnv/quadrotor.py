@@ -16,7 +16,7 @@ class Physics(str, Enum):
     PYB_GND_DRAG_DW = 'pyb_gnd_drag_dw'  # PyBullet physics update with ground effect, drag, and downwash.
 class Quadrotor:
     def __init__(self, pybullet_client, urdf_path, pybullet_steps_per_ctrl, is_domain_randomization=False, 
-                 physics=Physics.PYB,
+                 physics_type=Physics.PYB,
                  verbose=False):
         self.PYB_CLIENT = pybullet_client
         self._urdf_path = urdf_path
@@ -24,7 +24,7 @@ class Quadrotor:
 
         self._verbose = verbose
         
-        self._physics = physics
+        self._physics_type = physics_type
 
         self._is_domain_randomization = is_domain_randomization
         
@@ -83,7 +83,7 @@ class Quadrotor:
     def step(self, action):
         for _ in range(self._pybullet_steps_per_ctrl):
             self._physics(action)
-            if self._physics == Physics.PYB_DRAG:
+            if self._physics_type == Physics.PYB_DRAG:
                 self._drag(action)
             pybullet.stepSimulation(physicsClientId=self.PYB_CLIENT)
             self.last_action = action

@@ -143,7 +143,7 @@ class FlightEnv(gym.Env):
         # return generate_line(episode_len_sec=episode_len_sec, sample_time=sample_time)
         # return generate_uniform_line(episode_len_sec=episode_len_sec, sample_time=sample_time)
         # return generate_hover(episode_len_sec=episode_len_sec, sample_time=sample_time)
-        average_speed = 1.5
+        average_speed = 0.4
         pos, vel, acc = load_trajectory(episode_len_sec=episode_len_sec, sample_time=sample_time, average_speed=average_speed)
         return pos, vel, acc
 
@@ -160,7 +160,7 @@ class FlightEnv(gym.Env):
             self.quadrotor = Quadrotor(pybullet_client=self.PYB_CLIENT, urdf_path=self._urdf_path,
                                        pybullet_steps_per_ctrl=self._pybullet_steps_per_ctrl, 
                                        is_domain_randomization=self._is_domain_randomization, 
-                                       physics=Physics.PYB_DRAG, verbose=self._verbose)
+                                       physics_type=Physics.PYB_DRAG, verbose=self._verbose)
 
         self.quadrotor.reset(reload_urdf=False)
 
