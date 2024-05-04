@@ -96,6 +96,36 @@ class Quadrotor:
                               torqueObj=[0, 0, z_torque],
                               flags=pybullet.LINK_FRAME,
                               physicsClientId=self.PYB_CLIENT)
+        
+    def _drag(self, rpm):
+        '''PyBullet implementation of a drag model.
+
+        Based on the the system identification in (Forster, 2015).
+
+        Have to use last action to compute drag.
+
+        Args:
+            rpm (ndarray): (4)-shaped array of ints containing the RPMs values of the 4 motors.
+            nth_drone (int): The ordinal number/position of the desired drone in list self.DRONE_IDS.
+
+        '''
+        # Rotation matrix of the base.
+        base_rot = np.array(pybullet.getMatrixFromQuaternion(
+            self.quat)).reshape(3, 3)
+        # Simple draft model applied to the base/center of mass #
+        drag_factors = -1 * self.DRAG_COEFF * np.sum(
+            np.array(2 * np.pi * rpm / 60))
+        drag = np.dot(base_rot, drag_factors * np.array(self.vel))
+        pybullet.applyExternalForce(self.my_quadrotor,
+                             4,
+                             forceObj=drag,
+                             posObj=[0, 0, 0],
+                             flags=pybullet.LINK_FRAME,
+                             physicsClientId=self.PYB_CLIENT)
+        
+    def _ground_effect(self, rpm):
+        pass
+
 
     def _update_and_store_kinematic_information(self):
         self.pos, self.quat = pybullet.getBasePositionAndOrientation(self.my_quadrotor, physicsClientId=self.PYB_CLIENT)

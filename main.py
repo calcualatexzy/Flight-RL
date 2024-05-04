@@ -31,7 +31,7 @@ def train():
                 policy_kwargs=policy_kargs, 
                 tensorboard_log=log_dir, verbose=1,
                 device=device)
-    # need to add entropy coefficient -> force the agent to explore 0.01 -> track KL divergence, too high means overexploration
+        
         checkpoint_callback = CheckpointCallback(save_freq=1e6, save_path="temp_checkpoints", name_prefix="QuadrotorPPO")
     
         model.learn(total_timesteps=20*1e6, reset_num_timesteps=True, tb_log_name="ppo_flight_env", callback=checkpoint_callback)
