@@ -124,6 +124,7 @@ def plot_trajectory(trajectory_points, velocities, accelerations):
 
 def save_trajectory(cnt, trajectory_points, velocities, accelerations):
     # Save the trajectory points, velocities, and accelerations to a file, reading them back in dictionary format
+    print(cnt)
     np.savez(f'FlightEnv/TrajLib/traj_200Hz_len5_vel1.5/{cnt}.npz', trajectory_points=trajectory_points, velocities=velocities, accelerations=accelerations)
 
 def load_trajectory(episode_len_sec, sample_time, average_speed, num_files=100):

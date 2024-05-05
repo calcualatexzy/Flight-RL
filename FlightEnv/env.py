@@ -13,11 +13,21 @@ import math
 from copy import deepcopy
 import time
 import matplotlib.pyplot as plt
+from PIL import Image
+from datetime import datetime
 
 from FlightEnv.quadrotor import Quadrotor, Physics
 from FlightEnv.gen_traj import generate_trajectory
 from FlightEnv.gen_line import generate_line, generate_uniform_line, generate_hover
 from FlightEnv.optim_gen_traj import load_trajectory
+
+class ImageType(Enum):
+    """Camera capture image type enumeration class."""
+
+    RGB = 0     # Red, green, blue (and alpha)
+    DEP = 1     # Depth
+    SEG = 2     # Segmentation by object id
+    BW = 3      # Black and white
 
 class FlightEnv(gym.Env):
     metadata = {"render.modes": ["human", "rgb_array"], "video.frames_per_second": 100}
@@ -25,6 +35,7 @@ class FlightEnv(gym.Env):
     def __init__(self, render=False, mode="Hover",
                  verbose=False, 
                  hard_reset=True,
+                 record=False,
                  # reward_state_weight should be a diagonal matrix
                  reward_state_pos_xy_weight=1,
                  reward_state_pos_z_weight=1,
@@ -32,8 +43,6 @@ class FlightEnv(gym.Env):
                  reward_state_attitude_weight=0.5,
                  reward_state_ang_vel_weight=0.01,
                  reward_action_weight=0.001,
-                 reward_constraint_pos_radius=0.5,
-                 reward_constraint_pos_penalty=1.0,
                  reward_exponential=False,
                  is_domain_randomization=True,
                  goal_horizon=5,
@@ -41,6 +50,7 @@ class FlightEnv(gym.Env):
                  episode_len_sec=5,
                  ctrl_freq = 200,
                  pybullet_freq = 600,
+                 fov_img_freq = 10,
                  physics: Physics = Physics.PYB_DRAG,
                  drone_model ='cf2x',
                  flight_urdf_root="FlightEnv/assets"):
@@ -62,11 +72,13 @@ class FlightEnv(gym.Env):
 
         self._env_step_counter = 0
         self._is_render = render
+        self._is_record = record
         self._mode = mode
         self._physics = Physics(physics)
         self._time_step = 1. / ctrl_freq
         self._pybullet_time_step = 1. / pybullet_freq
         self._pybullet_steps_per_ctrl = int(pybullet_freq / ctrl_freq)
+        self._fov_img_freq = fov_img_freq
 
         self._is_domain_randomization = is_domain_randomization
 
@@ -74,6 +86,10 @@ class FlightEnv(gym.Env):
             self.PYB_CLIENT = pybullet.connect(pybullet.GUI)
         else:
             self.PYB_CLIENT = pybullet.connect(pybullet.DIRECT)
+
+        if self._is_record:
+            self.ONBOARD_IMG_PATH = "recording_" + datetime.now().strftime("%m.%d.%Y_%H.%M.%S")
+            os.makedirs(self.ONBOARD_IMG_PATH, exist_ok=True)
 
         self._hard_reset = True
 
@@ -89,6 +105,10 @@ class FlightEnv(gym.Env):
         if self._last_horizon > 0:
             self._last_state_queue = np.zeros((self._last_horizon, self.state_dim))
 
+        self._depth_img = None
+        self._rgb_img = None
+        self._seg_img = None
+
         seed = self.seed()
         self.reset(seed=seed)
 
@@ -99,8 +119,6 @@ class FlightEnv(gym.Env):
             reward_state_attitude_weight, reward_state_attitude_weight, reward_state_attitude_weight,
             reward_state_ang_vel_weight, reward_state_ang_vel_weight, reward_state_ang_vel_weight
         ])
-        self.reward_constraint_pos_radius = reward_constraint_pos_radius
-        self.reward_constraint_pos_penalty = reward_constraint_pos_penalty
 
         self._reward_action_weight = reward_action_weight
         self._reward_exponential = reward_exponential
@@ -226,6 +244,14 @@ class FlightEnv(gym.Env):
         if self._is_render:
             self._debug_state = np.append(self._debug_state, self._state)
             self._debug_reward.append(reward)
+
+        # self._rgb_img, self._depth_img, self._seg_img = self._get_fovimgs()
+        if self._is_record:
+            self._exportImage(img_type=ImageType.DEP, # ImageType.BW, ImageType.DEP, ImageType.SEG
+                                    img_input=self._depth_img,
+                                    path=self.ONBOARD_IMG_PATH,
+                                    frame_num=int(self._env_step_counter/self._fov_img_freq)
+                                    )
         # print("reward: ", reward)
         return obs, reward, terminated, truncated, info
 
@@ -269,6 +295,68 @@ class FlightEnv(gym.Env):
                                     physicsClientId=self.PYB_CLIENT)
         # plot the goal trajectory in matplotlib
 
+    def _get_fovimgs(self, segmentation=False):
+        rot_mat = np.array(pybullet.getMatrixFromQuaternion(self.quadrotor.quat)).reshape(3, 3)
+        target = np.dot(rot_mat,np.array([1000, 0, 0])) + np.array(self.quadrotor.pos)
+        DRONE_CAM_VIEW = pybullet.computeViewMatrix(cameraEyePosition=self.quadrotor.pos+np.array([0, 0, self.quadrotor.L]),
+                                             cameraTargetPosition=target,
+                                             cameraUpVector=[0, 0, 1],
+                                             physicsClientId=self.PYB_CLIENT
+                                             )
+        DRONE_CAM_PRO =  pybullet.computeProjectionMatrixFOV(fov=60.0,
+                                                      aspect=1.0,
+                                                      nearVal=self.quadrotor.L,
+                                                      farVal=1000.0
+                                                      )
+        SEG_FLAG = pybullet.ER_SEGMENTATION_MASK_OBJECT_AND_LINKINDEX if segmentation else pybullet.ER_NO_SEGMENTATION_MASK
+        [w, h, rgb, dep, seg] = pybullet.getCameraImage(width=self.RENDER_WIDTH,
+                                                 height=self.RENDER_HEIGHT,
+                                                 shadow=1,
+                                                 viewMatrix=DRONE_CAM_VIEW,
+                                                 projectionMatrix=DRONE_CAM_PRO,
+                                                 flags=SEG_FLAG,
+                                                 physicsClientId=self.PYB_CLIENT
+                                                 )
+        rgb = np.reshape(rgb, (h, w, 4))
+        dep = np.reshape(dep, (h, w))
+        seg = np.reshape(seg, (h, w))
+        return rgb, dep, seg
+    
+    def _exportImage(self,
+                     img_type: ImageType,
+                     img_input,
+                     path: str,
+                     frame_num: int=0
+                     ):
+        """Returns camera captures from the n-th drone POV.
+
+        Parameters
+        ----------
+        img_type : ImageType
+            The image type: RGB(A), depth, segmentation, or B&W (from RGB).
+        img_input : ndarray
+            (h, w, 4)-shaped array of uint8's for RBG(A) or B&W images.
+            (h, w)-shaped array of uint8's for depth or segmentation images.
+        path : str
+            Path where to save the output as PNG.
+        fram_num: int, optional
+            Frame number to append to the PNG's filename.
+
+        """
+        if img_type == ImageType.RGB:
+            (Image.fromarray(img_input.astype('uint8'), 'RGBA')).save(os.path.join(path,"frame_"+str(frame_num)+".png"))
+        elif img_type == ImageType.DEP:
+            temp = ((img_input-np.min(img_input)) * 255 / (np.max(img_input)-np.min(img_input))).astype('uint8')
+        elif img_type == ImageType.SEG:
+            temp = ((img_input-np.min(img_input)) * 255 / (np.max(img_input)-np.min(img_input))).astype('uint8')
+        elif img_type == ImageType.BW:
+            temp = (np.sum(img_input[:, :, 0:2], axis=2) / 3).astype('uint8')
+        else:
+            print("[ERROR] in BaseAviary._exportImage(), unknown ImageType")
+            exit()
+        if img_type != ImageType.RGB:
+            (Image.fromarray(temp)).save(os.path.join(path,"frame_"+str(frame_num)+".png"))
+
     def _get_observation(self):
         R_wb = np.array(pybullet.getMatrixFromQuaternion(self.quadrotor.quat)).reshape(3, 3)
         R_bw = R_wb.T
@@ -306,17 +394,7 @@ class FlightEnv(gym.Env):
         # print("goal: ", self.state_goal[wp_idx])
         dist = np.sum(state_error @ self._reward_state_Q @ state_error) + self._reward_action_weight * np.sum(action_error**2)
         reward = -dist
-        # constraint penalty
-        # pos constraint: radius penalty
-        pos = np.array([self._state[0], self._state[2], self._state[4]])
-        goal_pos = np.array([self.state_goal[wp_idx, 0], self.state_goal[wp_idx, 2], self.state_goal[wp_idx, 4]])
-        last_goal_pos = np.array([self.state_goal[wp_idx - 1, 0], self.state_goal[wp_idx - 1, 2], self.state_goal[wp_idx - 1, 4]])
-        adj_pos = np.linalg.norm(last_goal_pos - goal_pos)
-        self.reward_constraint_pos_radius = max(self.reward_constraint_pos_radius, adj_pos * self._goal_horizon * 2)
-        # if np.linalg.norm(pos - goal_pos) > self.reward_constraint_pos_radius:
-        #     reward -= self.reward_constraint_pos_penalty
-            
-        # add velocity direction
+
         if self._reward_exponential:
             reward = np.exp(reward)
         return reward
