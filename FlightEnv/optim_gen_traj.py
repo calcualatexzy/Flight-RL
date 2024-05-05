@@ -5,6 +5,7 @@ import time
 
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
+from trajCheck import TrajCheck
 def bezier_curve(t, control_points):
     """
     Evaluate a point on the Bezier curve given parameter t and control points.
@@ -90,11 +91,17 @@ def generate_trajectory(episode_len_sec, sample_time, average_speed):
                             np.random.uniform(low=0.3, high=0.7)]
     # control_points[-1] = [np.random.uniform(low=-max_position, high=max_position), np.random.uniform(low=-max_position, high=max_position), np.random.uniform(low=0.3, high=0.7)]
     
+    # wang lijie add
+    points = control_points.copy()
+    data = points.flatten().tolist()
+    data.remove(data[0])
+    data.remove(data[0])
+    data.remove(data[0])
     eval_points = int(episode_len_sec / sample_time)
     trajectory_points, velocities, accelerations = trajectory(control_points, eval_points, episode_len_sec)
 
 
-    return trajectory_points, velocities, accelerations
+    return trajectory_points, velocities, accelerations, data
 
 def plot_trajectory(trajectory_points, velocities, accelerations):
     fig = plt.figure()
@@ -125,6 +132,7 @@ def plot_trajectory(trajectory_points, velocities, accelerations):
 def save_trajectory(cnt, trajectory_points, velocities, accelerations):
     # Save the trajectory points, velocities, and accelerations to a file, reading them back in dictionary format
     print(cnt)
+    #np.savez(f'FlightEnv/TrajLib/traj_200Hz_len5_vel1.5/{cnt}.npz', trajectory_points=trajectory_points, velocities=velocities, accelerations=accelerations)
     np.savez(f'FlightEnv/TrajLib/traj_200Hz_len5_vel1.5/{cnt}.npz', trajectory_points=trajectory_points, velocities=velocities, accelerations=accelerations)
 
 def load_trajectory(episode_len_sec, sample_time, average_speed, num_files=100):
@@ -143,17 +151,64 @@ if __name__ == "__main__":
     episode_len_sec = 5
     sample_time = 0.005
     average_speed = 1.5
+    checkData = []
+    totalNum = 100
+    cnt = 0
+    checkingLine = 8
+    num = 6
+    # # start_time = time.time()
+    # for i in range(100):
+    #     trajectory_points, velocities, accelerations, data = generate_trajectory(episode_len_sec, sample_time, average_speed)
+    #     save_trajectory(i, trajectory_points, velocities, accelerations)
+    # # print("Time taken: ", time.time() - start_time)
 
-    # start_time = time.time()
-    for i in range(1000):
-        trajectory_points, velocities, accelerations = generate_trajectory(episode_len_sec, sample_time, average_speed)
-        save_trajectory(i, trajectory_points, velocities, accelerations)
-    # print("Time taken: ", time.time() - start_time)
-    # trajectory_points, velocities, accelerations = generate_trajectory(episode_len_sec, sample_time, average_speed)
+
+    # trajectory_points, velocities, accelerations, data = generate_trajectory(episode_len_sec, sample_time, average_speed)
     # # Plotting
     # print(trajectory_points.shape, velocities.shape, accelerations.shape)
     # plot_trajectory(trajectory_points, velocities, accelerations)
 
     # Loading
     # load_trajectory(0)
+    
+    while True:
+        if cnt == totalNum:
+            break
+        else:
+            if cnt < checkingLine:
+                print("trajs not enough, Generating!!!")
+                trajectory_points, velocities, accelerations, data = generate_trajectory(episode_len_sec, sample_time, average_speed)
+                save_trajectory(cnt+200, trajectory_points, velocities, accelerations)
+                checkData.append(data)
+                cnt += 1
+                if cnt == checkingLine:
+                    trajCheck = TrajCheck(checkData)
+                    trajCheck.updateMeanVector()
+                    trajCheck.generateCovMatrix()
+                    trajCheck.computeEigenvalues()
+            elif cnt >= checkingLine:
+                print("长度", len(trajCheck.checkData))
+                print("Checking!!!")
+                trajectory_points, velocities, accelerations, data = generate_trajectory(episode_len_sec, sample_time, average_speed)
+                trajCheck.updateMeanVectorAndCovMatrix(data)
+                trajCheck.computeEigenvalues()
+                if trajCheck.jugdeDivergence(num):
+                    print("contributions", trajCheck.computeContributions())
+                    print ("Divergence!!!")
+                    save_trajectory(cnt+200, trajectory_points, velocities, accelerations)
+                    cnt += 1
+                    if num < 9:
+                        num += 1
+                else:
+                    print("contributions", trajCheck.computeContributions())
+                    trajCheck.checkData.remove(trajCheck.checkData[-1])
+                    trajCheck.updateMeanVector()
+                    trajCheck.generateCovMatrix()
+                    print ("Convergence!!!")
+                    continue
+          
+                
+
+
+
 
