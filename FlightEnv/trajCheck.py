@@ -33,7 +33,7 @@ class TrajCheck:
         contributions = [eigenValue / total for eigenValue in self.eigenValues]
         return contributions
     
-    def jugdeDivergence(self, num):    #检查特征值贡献是否平均
+    def judgeDivergence(self, num):    #检查特征值贡献是否平均
         list = self.computeContributions()
         if(list[0] >= 0.3):
             return False
@@ -45,6 +45,7 @@ class TrajCheck:
             return True
         else:
             return False
+    
 
 
 if __name__ == '__main__':
