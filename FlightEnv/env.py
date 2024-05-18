@@ -52,7 +52,8 @@ class FlightEnv(gym.Env):
                  pybullet_freq = 600,
                  fov_img_freq = 10,
                  physics: Physics = Physics.PYB_DRAG,
-                 drone_model ='cf2x',
+                #  drone_model ='cf2x',
+                 drone_model ='250',
                  flight_urdf_root="FlightEnv/assets"):
         super(FlightEnv, self).__init__()
         # Constants.
@@ -229,7 +230,7 @@ class FlightEnv(gym.Env):
           info: A dictionary that stores diagnostic information.
         """
         raw_action = action
-        # action = np.ones(self.action_dim) * self.quadrotor.MASS * self.GRAVITY_ACC / self.action_dim
+        action = np.ones(self.action_dim) * self.quadrotor.MASS * self.GRAVITY_ACC / self.action_dim
         rpm = self._preprocess_action(action)
         self.quadrotor.step(rpm)
         self._env_step_counter += 1
