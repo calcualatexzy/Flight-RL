@@ -5,7 +5,7 @@ import time
 
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
-from trajCheck import TrajCheck
+from FlightEnv.trajCheck import TrajCheck
 def bezier_curve(t, control_points):
     """
     Evaluate a point on the Bezier curve given parameter t and control points.
