@@ -39,7 +39,7 @@ class FlightEnv(gym.Env):
                  # reward_state_weight should be a diagonal matrix
                  reward_state_pos_xy_weight=1,
                  reward_state_pos_z_weight=1,
-                 reward_state_vel_weight=0.1,
+                 reward_state_vel_weight=0.02,
                  reward_state_attitude_weight=0.5,
                  reward_state_ang_vel_weight=0.01,
                  reward_action_weight=0.001,
