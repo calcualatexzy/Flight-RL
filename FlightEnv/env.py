@@ -99,7 +99,11 @@ class FlightEnv(gym.Env):
         self._last_horizon = last_horizon
         self._episode_len_sec = episode_len_sec
 
-        self.action_dim = 4
+        # self.action_dim = 4
+        #### euler action space ####
+        self.action_dim = 7
+        #### euler action space ####
+
         self.state_dim = 12
         self.observation_dim = 12 * (1 + self._goal_horizon)
 
@@ -124,8 +128,6 @@ class FlightEnv(gym.Env):
         self._reward_action_weight = reward_action_weight
         self._reward_exponential = reward_exponential
 
-        # Action space: 4 motors thrusts 
-        # try normalizing action around hover thrust?
         action_low, action_high = self._set_action()
         self.action_bounds = np.array([action_low, action_high])
         self.action_space = gym.spaces.Box(low=action_low, high=action_high, dtype=np.float32)
@@ -203,7 +205,10 @@ class FlightEnv(gym.Env):
             np.zeros(vel_ref.shape[0]),
             np.zeros(vel_ref.shape[0])
         ]).transpose()
-        self.action_goal = np.ones(self.action_dim) * self.quadrotor.MASS * self.GRAVITY_ACC / self.action_dim
+        # self.action_goal = np.ones(self.action_dim) * self.quadrotor.MASS * self.GRAVITY_ACC / self.action_dim
+        #### euler action space ####
+        self.action_goal = np.zeros(self.action_dim)
+        #### euler action space ####
         
         self._env_step_counter = 0
         self._out_of_bounds = False
@@ -230,7 +235,7 @@ class FlightEnv(gym.Env):
           info: A dictionary that stores diagnostic information.
         """
         raw_action = action
-        action = np.ones(self.action_dim) * self.quadrotor.MASS * self.GRAVITY_ACC / self.action_dim
+        # action = np.ones(self.action_dim) * self.quadrotor.MASS * self.GRAVITY_ACC / self.action_dim
         rpm = self._preprocess_action(action)
         self.quadrotor.step(rpm)
         self._env_step_counter += 1
@@ -366,6 +371,7 @@ class FlightEnv(gym.Env):
                                        self.quadrotor.pos[1], self.quadrotor.vel[1],
                                        self.quadrotor.pos[2], self.quadrotor.vel[2],
                                        self.quadrotor.rpy, ang_vel_b]).reshape((self.state_dim,))
+        # print(np.array(self.quadrotor.rpy)*180/np.pi)
         # extend observation with horizon
         obs = deepcopy(self._state)
         if self._goal_horizon > 0:
@@ -463,6 +469,11 @@ class FlightEnv(gym.Env):
         # TODO: apply disturbance in action 
 
         action = np.clip(action, self.action_bounds[0], self.action_bounds[1])
+
+        #### euler action space ####
+        action = self.quadrotor.euler_step(action)
+        #### euler action space ####
+
         rpm = self.quadrotor.thrust2rpm(action)
 
         return rpm
@@ -472,9 +483,26 @@ class FlightEnv(gym.Env):
         """
         Return action bounds.
         """
-        action_low = self.quadrotor.KF * (self.quadrotor.PWM2RPM_SCALE * self.quadrotor.MIN_PWM + self.quadrotor.PWM2RPM_CONST)**2
-        action_high = self.quadrotor.KF * (self.quadrotor.PWM2RPM_SCALE * self.quadrotor.MAX_PWM + self.quadrotor.PWM2RPM_CONST)**2
-        return np.full(self.action_dim, action_low, np.float32), np.full(self.action_dim, action_high, np.float32)
+        # action_low = self.quadrotor.KF * (self.quadrotor.PWM2RPM_SCALE * self.quadrotor.MIN_PWM + self.quadrotor.PWM2RPM_CONST)**2
+        # action_high = self.quadrotor.KF * (self.quadrotor.PWM2RPM_SCALE * self.quadrotor.MAX_PWM + self.quadrotor.PWM2RPM_CONST)**2
+        # return np.full(self.action_dim, action_low, np.float32), np.full(self.action_dim, action_high, np.float32)
+
+        #### euler action space ####
+        acc_threshold = self.GRAVITY_ACC * 3
+        phi_threshold_radians = 85 * math.pi / 180
+        theta_threshold_radians = 85 * math.pi / 180
+        psi_threshold_radians = 180 * math.pi / 180  # Do not bound yaw.
+        action_low = np.array([-acc_threshold, 
+                               -phi_threshold_radians, -theta_threshold_radians, -psi_threshold_radians,
+                               -np.finfo(np.float32).max, -np.finfo(np.float32).max, -np.finfo(np.float32).max])
+        action_high = np.array([acc_threshold, 
+                                phi_threshold_radians, theta_threshold_radians, psi_threshold_radians,
+                                np.finfo(np.float32).max, np.finfo(np.float32).max, np.finfo(np.float32).max])
+        return action_low, action_high
+        #### euler action space ####
+
+
+
 
     def _set_observation(self):
         x_threshold = self._pos_threshold[0]

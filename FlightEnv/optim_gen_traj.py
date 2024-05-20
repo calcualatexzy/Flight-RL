@@ -5,7 +5,7 @@ import time
 
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
-from FlightEnv.trajCheck import TrajCheck
+# from FlightEnv.trajCheck import TrajCheck
 def bezier_curve(t, control_points):
     """
     Evaluate a point on the Bezier curve given parameter t and control points.
@@ -163,49 +163,49 @@ if __name__ == "__main__":
     # # print("Time taken: ", time.time() - start_time)
 
 
-    # trajectory_points, velocities, accelerations, data = generate_trajectory(episode_len_sec, sample_time, average_speed)
-    # # Plotting
-    # print(trajectory_points.shape, velocities.shape, accelerations.shape)
-    # plot_trajectory(trajectory_points, velocities, accelerations)
+    trajectory_points, velocities, accelerations, data = generate_trajectory(episode_len_sec, sample_time, average_speed)
+    # Plotting
+    print(trajectory_points.shape, velocities.shape, accelerations.shape)
+    plot_trajectory(trajectory_points, velocities, accelerations)
 
     # Loading
     # load_trajectory(0)
     
-    while True:
-        if cnt == totalNum:
-            break
-        else:
-            if cnt < checkingLine:
-                print("trajs not enough, Generating!!!")
-                trajectory_points, velocities, accelerations, data = generate_trajectory(episode_len_sec, sample_time, average_speed)
-                save_trajectory(cnt+200, trajectory_points, velocities, accelerations)
-                checkData.append(data)
-                cnt += 1
-                if cnt == checkingLine:
-                    trajCheck = TrajCheck(checkData)
-                    trajCheck.updateMeanVector()
-                    trajCheck.generateCovMatrix()
-                    trajCheck.computeEigenvalues()
-            elif cnt >= checkingLine:
-                print("长度", len(trajCheck.checkData))
-                print("Checking!!!")
-                trajectory_points, velocities, accelerations, data = generate_trajectory(episode_len_sec, sample_time, average_speed)
-                trajCheck.updateMeanVectorAndCovMatrix(data)
-                trajCheck.computeEigenvalues()
-                if trajCheck.jugdeDivergence(num):
-                    print("contributions", trajCheck.computeContributions())
-                    print ("Divergence!!!")
-                    save_trajectory(cnt+200, trajectory_points, velocities, accelerations)
-                    cnt += 1
-                    if num < 9:
-                        num += 1
-                else:
-                    print("contributions", trajCheck.computeContributions())
-                    trajCheck.checkData.remove(trajCheck.checkData[-1])
-                    trajCheck.updateMeanVector()
-                    trajCheck.generateCovMatrix()
-                    print ("Convergence!!!")
-                    continue
+    # while True:
+    #     if cnt == totalNum:
+    #         break
+    #     else:
+    #         if cnt < checkingLine:
+    #             print("trajs not enough, Generating!!!")
+    #             trajectory_points, velocities, accelerations, data = generate_trajectory(episode_len_sec, sample_time, average_speed)
+    #             save_trajectory(cnt+200, trajectory_points, velocities, accelerations)
+    #             checkData.append(data)
+    #             cnt += 1
+    #             if cnt == checkingLine:
+    #                 trajCheck = TrajCheck(checkData)
+    #                 trajCheck.updateMeanVector()
+    #                 trajCheck.generateCovMatrix()
+    #                 trajCheck.computeEigenvalues()
+    #         elif cnt >= checkingLine:
+    #             print("长度", len(trajCheck.checkData))
+    #             print("Checking!!!")
+    #             trajectory_points, velocities, accelerations, data = generate_trajectory(episode_len_sec, sample_time, average_speed)
+    #             trajCheck.updateMeanVectorAndCovMatrix(data)
+    #             trajCheck.computeEigenvalues()
+    #             if trajCheck.jugdeDivergence(num):
+    #                 print("contributions", trajCheck.computeContributions())
+    #                 print ("Divergence!!!")
+    #                 save_trajectory(cnt+200, trajectory_points, velocities, accelerations)
+    #                 cnt += 1
+    #                 if num < 9:
+    #                     num += 1
+    #             else:
+    #                 print("contributions", trajCheck.computeContributions())
+    #                 trajCheck.checkData.remove(trajCheck.checkData[-1])
+    #                 trajCheck.updateMeanVector()
+    #                 trajCheck.generateCovMatrix()
+    #                 print ("Convergence!!!")
+    #                 continue
           
                 
 

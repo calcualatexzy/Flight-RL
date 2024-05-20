@@ -51,6 +51,11 @@ class Quadrotor:
         self.ang_vel = np.zeros(3)
         self.last_action = np.zeros(4)
 
+        #### euler action space ####
+        self.euler_Kp = np.array([0.1, 0.1, 0.1])
+        self.euler_Kd = np.array([0.1, 0.1, 0.1])
+        #### euler action space ####
+
         self._step_counter = 0
 
         self.reset(reload_urdf=True)
@@ -89,7 +94,35 @@ class Quadrotor:
             self.last_action = action
         self._update_and_store_kinematic_information()
         self._step_counter += 1
-        
+
+    def euler_step(self, action):
+        # plus or minus?
+        u1 = self.MASS * (self.GRAVITY_ACC - action[0])
+        euler_c = action[1:4]
+        euler_vel_c = action[4:]
+        euler_acc_c = self._euler_pid(euler_c, euler_vel_c, euler_acc_c, self.rpy, self.ang_vel)
+        u2 = np.dot(self.J, euler_acc_c) - np.cross(self.ang_vel, np.dot(self.J, self.ang_vel))
+        rpm = self._u2rpm(u1, u2)
+        thrust = np.sum(rpm**2) * self.KF
+        return thrust
+
+    def _euler_pid(self, euler_c, euler_vel_c, euler_acc_c, rpy, ang_vel):
+        euler_err = euler_c - rpy
+        euler_vel_err = euler_vel_c - ang_vel
+        euler_acc_c = self.euler_Kp * euler_err + self.euler_Kd * euler_vel_err
+        return euler_acc_c
+    
+    def _u2rpm(self, u1, u2):
+        # u1 = KF * (rpm1**2 + rpm2**2 + rpm3**2 + rpm4**2)
+        # u2[0] = L * KF * (rpm2**2 - rpm4**2)
+        # u2[1] = L * KF * (rpm3**2 - rpm1**2)
+        # u2[2] = KM * (rpm1**2 - rpm2**2 + rpm3**2 - rpm4**2)
+        rpm1 = np.sqrt((u1/self.KF + u2[2]/self.KM - 2*u2[1]/(self.L*self.KF))/4)
+        rpm2 = np.sqrt((u1/self.KF - u2[2]/self.KM + 2*u2[0]/(self.L*self.KF))/4)
+        rpm3 = np.sqrt((u1/self.KF + u2[2]/self.KM + 2*u2[1]/(self.L*self.KF))/4)
+        rpm4 = np.sqrt((u1/self.KF - u2[2]/self.KM - 2*u2[0]/(self.L*self.KF))/4)
+        return np.array([rpm1, rpm2, rpm3, rpm4])
+
 
     def _physics(self, rpm):
         '''Base PyBullet physics implementation.
