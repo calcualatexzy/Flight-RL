@@ -52,8 +52,16 @@ class Quadrotor:
         self.last_action = np.zeros(4)
 
         #### euler action space ####
-        self.euler_Kp = np.array([0.1, 0.1, 0.1])
-        self.euler_Kd = np.array([0.1, 0.1, 0.1])
+        # roll, pitch, yaw in DEGREE
+        self.euler_Kp = np.array([8.0, 8.0, 4.0])
+        self.euler_vel_Kp = np.array([0.2, 0.2, 0.2])
+        self.euler_vel_Kd = np.array([0.004, 0.004, 0.0])
+        self.euler_vel_Ki = np.array([0.1, 0.1, 0.1])
+        self.euler_vel_K = np.array([0.7, 0.7, 0.5])
+        self.euler_vel_MAX = np.array([1600.0, 1600.0, 1000.0])
+        self.euler_vel_integral = 0.0
+        self.euler_vel_integral_LIM = np.array([0.3, 0.3, 0.3])
+        self.euler_vel_prev_error = 0.0
         #### euler action space ####
 
         self._step_counter = 0
@@ -99,28 +107,41 @@ class Quadrotor:
         # plus or minus?
         u1 = self.MASS * (self.GRAVITY_ACC - action[0])
         euler_c = action[1:4]
-        euler_vel_c = action[4:]
-        euler_acc_c = self._euler_pid(euler_c, euler_vel_c, euler_acc_c, self.rpy, self.ang_vel)
+        euler_vel_c = self._euler_pid(euler_c, self.rpy)
+        euler_acc_c = self._euler_vel_pid(euler_vel_c, self.ang_vel) * self.DEG2RAD
         u2 = np.dot(self.J, euler_acc_c) - np.cross(self.ang_vel, np.dot(self.J, self.ang_vel))
         rpm = self._u2rpm(u1, u2)
-        thrust = np.sum(rpm**2) * self.KF
+        thrust = (rpm**2) * self.KF
         return thrust
 
-    def _euler_pid(self, euler_c, euler_vel_c, euler_acc_c, rpy, ang_vel):
-        euler_err = euler_c - rpy
-        euler_vel_err = euler_vel_c - ang_vel
-        euler_acc_c = self.euler_Kp * euler_err + self.euler_Kd * euler_vel_err
-        return euler_acc_c
+    def _euler_pid(self, euler_c, rpy):
+        rpy = np.array(rpy)
+        e = (euler_c - rpy) * self.RAD2DEG
+        return np.clip(self.euler_Kp * e, -self.euler_vel_MAX, self.euler_vel_MAX)
+
+    def _euler_vel_pid(self, euler_vel_c, ang_vel):
+        ang_vel = np.array(ang_vel)
+        error = euler_vel_c - (ang_vel * self.RAD2DEG)
+        self.euler_vel_integral += error
+        self.euler_vel_integral = np.clip(self.euler_vel_integral, -self.euler_vel_integral_LIM, self.euler_vel_integral_LIM)
+        derivative = error - self.euler_vel_prev_error
+        self.euler_vel_prev_error = error
+        return self.euler_vel_K * (self.euler_vel_Kp * error + self.euler_vel_Ki * self.euler_vel_integral + self.euler_vel_Kd * derivative)
     
     def _u2rpm(self, u1, u2):
         # u1 = KF * (rpm1**2 + rpm2**2 + rpm3**2 + rpm4**2)
         # u2[0] = L * KF * (rpm2**2 - rpm4**2)
         # u2[1] = L * KF * (rpm3**2 - rpm1**2)
         # u2[2] = KM * (rpm1**2 - rpm2**2 + rpm3**2 - rpm4**2)
-        rpm1 = np.sqrt((u1/self.KF + u2[2]/self.KM - 2*u2[1]/(self.L*self.KF))/4)
-        rpm2 = np.sqrt((u1/self.KF - u2[2]/self.KM + 2*u2[0]/(self.L*self.KF))/4)
-        rpm3 = np.sqrt((u1/self.KF + u2[2]/self.KM + 2*u2[1]/(self.L*self.KF))/4)
-        rpm4 = np.sqrt((u1/self.KF - u2[2]/self.KM - 2*u2[0]/(self.L*self.KF))/4)
+        term1 = u1 / self.KF
+        term2 = u2[2] / self.KM
+        term3_roll = 2 * u2[0] / (self.L * self.KF)
+        term3_pitch = 2 * u2[1] / (self.L * self.KF)
+
+        rpm1 = np.sqrt(np.clip((term1 + term2 - term3_pitch) / 4, 0, None))
+        rpm2 = np.sqrt(np.clip((term1 - term2 + term3_roll) / 4, 0, None))
+        rpm3 = np.sqrt(np.clip((term1 + term2 + term3_pitch) / 4, 0, None))
+        rpm4 = np.sqrt(np.clip((term1 - term2 - term3_roll) / 4, 0, None))
         return np.array([rpm1, rpm2, rpm3, rpm4])
 
 

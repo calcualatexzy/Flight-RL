@@ -101,7 +101,7 @@ class FlightEnv(gym.Env):
 
         # self.action_dim = 4
         #### euler action space ####
-        self.action_dim = 7
+        self.action_dim = 4
         #### euler action space ####
 
         self.state_dim = 12
@@ -236,6 +236,9 @@ class FlightEnv(gym.Env):
         """
         raw_action = action
         # action = np.ones(self.action_dim) * self.quadrotor.MASS * self.GRAVITY_ACC / self.action_dim
+        #### euler action space ####
+        action = np.zeros(self.action_dim)
+        #### euler action space ####
         rpm = self._preprocess_action(action)
         self.quadrotor.step(rpm)
         self._env_step_counter += 1
@@ -493,11 +496,9 @@ class FlightEnv(gym.Env):
         theta_threshold_radians = 85 * math.pi / 180
         psi_threshold_radians = 180 * math.pi / 180  # Do not bound yaw.
         action_low = np.array([-acc_threshold, 
-                               -phi_threshold_radians, -theta_threshold_radians, -psi_threshold_radians,
-                               -np.finfo(np.float32).max, -np.finfo(np.float32).max, -np.finfo(np.float32).max])
+                               -phi_threshold_radians, -theta_threshold_radians, -psi_threshold_radians])
         action_high = np.array([acc_threshold, 
-                                phi_threshold_radians, theta_threshold_radians, psi_threshold_radians,
-                                np.finfo(np.float32).max, np.finfo(np.float32).max, np.finfo(np.float32).max])
+                                phi_threshold_radians, theta_threshold_radians, psi_threshold_radians])
         return action_low, action_high
         #### euler action space ####
 
