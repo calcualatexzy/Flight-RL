@@ -6,10 +6,16 @@
 
   <link name="base_link">
 
-    <inertial>
+    <!-- <inertial>
       <origin rpy="0 0 0" xyz="0 0 0"/>
       <mass value="0.616"/>
       <inertia ixx="2.095e-3" ixy="0.0" ixz="0.0" iyy="3.287e-3" iyz="0.0" izz="2.138e-3"/>
+    </inertial> -->
+
+    <inertial>
+      <origin rpy="0 0 0" xyz="0 0 0"/>
+      <mass value="0.452"/>
+      <inertia ixx="1.571e-3" ixy="0.0" ixz="0.0" iyy="2.465e-3" iyz="0.0" izz="1.6035e-3"/>
     </inertial>
 
     <!-- links>

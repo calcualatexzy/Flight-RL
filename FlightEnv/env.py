@@ -457,6 +457,11 @@ class FlightEnv(gym.Env):
             plt.ylabel('Reward')
             plt.show()
 
+            #### euler action space ####
+            # plot action with env step
+            self.quadrotor.plot_euler_and_vel()
+            #### euler action space ####
+
         return terminated
     
     def seed(self, seed=None):

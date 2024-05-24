@@ -4,6 +4,7 @@ import numpy as np
 import xml.etree.ElementTree as etxml
 import math
 import pybullet
+import matplotlib.pyplot as plt
 
 class Physics(str, Enum):
     '''Physics implementations enumeration class.'''
@@ -62,6 +63,9 @@ class Quadrotor:
         self.euler_vel_integral = 0.0
         self.euler_vel_integral_LIM = np.array([0.3, 0.3, 0.3])
         self.euler_vel_prev_error = 0.0
+
+        self.euler_log = []
+        self.euler_vel_log = []
         #### euler action space ####
 
         self._step_counter = 0
@@ -104,14 +108,16 @@ class Quadrotor:
         self._step_counter += 1
 
     def euler_step(self, action):
-        # plus or minus?
-        u1 = self.MASS * (self.GRAVITY_ACC - action[0])
+        u1 = self.MASS * (self.GRAVITY_ACC + action[0])
         euler_c = action[1:4]
         euler_vel_c = self._euler_pid(euler_c, self.rpy)
         euler_acc_c = self._euler_vel_pid(euler_vel_c, self.ang_vel) * self.DEG2RAD
         u2 = np.dot(self.J, euler_acc_c) - np.cross(self.ang_vel, np.dot(self.J, self.ang_vel))
         rpm = self._u2rpm(u1, u2)
         thrust = (rpm**2) * self.KF
+
+        self.euler_log.append([self.rpy, euler_c])
+        self.euler_vel_log.append([self.ang_vel, euler_vel_c])
         return thrust
 
     def _euler_pid(self, euler_c, rpy):
@@ -144,6 +150,57 @@ class Quadrotor:
         rpm4 = np.sqrt(np.clip((term1 - term2 - term3_roll) / 4, 0, None))
         return np.array([rpm1, rpm2, rpm3, rpm4])
 
+
+    def plot_euler_and_vel(self):
+        rpy_log = np.array([log[0] for log in self.euler_log])
+        euler_c_log = np.array([log[1] for log in self.euler_log])
+        
+        # Extract ang_vel and euler_vel_c from euler_vel_log
+        ang_vel_log = np.array([log[0] for log in self.euler_vel_log])
+        euler_vel_c_log = np.array([log[1] for log in self.euler_vel_log])
+
+        time_steps = range(len(rpy_log))
+
+        fig, axs = plt.subplots(2, 2, figsize=(14, 10))
+
+        # Plot rpy
+        axs[0, 0].plot(time_steps, rpy_log[:, 0], label='RPY X')
+        axs[0, 0].plot(time_steps, rpy_log[:, 1], label='RPY Y')
+        axs[0, 0].plot(time_steps, rpy_log[:, 2], label='RPY Z')
+        axs[0, 0].set_title('RPY Over Time')
+        axs[0, 0].set_xlabel('Time Step')
+        axs[0, 0].set_ylabel('RPY (degrees)')
+        axs[0, 0].legend()
+
+        # Plot euler_c
+        axs[0, 1].plot(time_steps, euler_c_log[:, 0], label='Euler Angle Command X')
+        axs[0, 1].plot(time_steps, euler_c_log[:, 1], label='Euler Angle Command Y')
+        axs[0, 1].plot(time_steps, euler_c_log[:, 2], label='Euler Angle Command Z')
+        axs[0, 1].set_title('Euler Angle Commands Over Time')
+        axs[0, 1].set_xlabel('Time Step')
+        axs[0, 1].set_ylabel('Euler Angle Commands (degrees)')
+        axs[0, 1].legend()
+
+        # Plot ang_vel
+        axs[1, 0].plot(time_steps, ang_vel_log[:, 0], label='Angular Velocity X')
+        axs[1, 0].plot(time_steps, ang_vel_log[:, 1], label='Angular Velocity Y')
+        axs[1, 0].plot(time_steps, ang_vel_log[:, 2], label='Angular Velocity Z')
+        axs[1, 0].set_title('Angular Velocities Over Time')
+        axs[1, 0].set_xlabel('Time Step')
+        axs[1, 0].set_ylabel('Angular Velocities (degrees/sec)')
+        axs[1, 0].legend()
+
+        # Plot euler_vel_c
+        axs[1, 1].plot(time_steps, euler_vel_c_log[:, 0], label='Euler Angular Velocity Command X')
+        axs[1, 1].plot(time_steps, euler_vel_c_log[:, 1], label='Euler Angular Velocity Command Y')
+        axs[1, 1].plot(time_steps, euler_vel_c_log[:, 2], label='Euler Angular Velocity Command Z')
+        axs[1, 1].set_title('Euler Angular Velocity Commands Over Time')
+        axs[1, 1].set_xlabel('Time Step')
+        axs[1, 1].set_ylabel('Euler Angular Velocity Commands (degrees/sec)')
+        axs[1, 1].legend()
+
+        plt.tight_layout()
+        plt.show()
 
     def _physics(self, rpm):
         '''Base PyBullet physics implementation.
