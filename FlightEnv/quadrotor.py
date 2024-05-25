@@ -50,14 +50,15 @@ class Quadrotor:
         self.rpy = np.zeros(3)
         self.vel = np.zeros(3)
         self.ang_vel = np.zeros(3)
+        self.rpy_vel = np.zeros(3)
         self.last_action = np.zeros(4)
 
         #### euler action space ####
         # roll, pitch, yaw in DEGREE
         self.euler_Kp = np.array([8.0, 8.0, 4.0])
-        self.euler_vel_Kp = np.array([0.2, 0.2, 0.2])
-        self.euler_vel_Kd = np.array([0.004, 0.004, 0.0])
-        self.euler_vel_Ki = np.array([0.1, 0.1, 0.1])
+        self.euler_vel_Kp = np.array([0.2, 0.2, -0.2]) * 100
+        self.euler_vel_Kd = np.array([0.004, 0.004, -0.002]) * 10
+        self.euler_vel_Ki = np.array([0.1, 0.1, -0.1])
         self.euler_vel_K = np.array([0.7, 0.7, 0.5])
         self.euler_vel_MAX = np.array([1600.0, 1600.0, 1000.0])
         self.euler_vel_integral = 0.0
@@ -110,14 +111,17 @@ class Quadrotor:
     def euler_step(self, action):
         u1 = self.MASS * (self.GRAVITY_ACC + action[0])
         euler_c = action[1:4]
+        self.lst_rpy = self.rpy
         euler_vel_c = self._euler_pid(euler_c, self.rpy)
-        euler_acc_c = self._euler_vel_pid(euler_vel_c, self.ang_vel) * self.DEG2RAD
-        u2 = np.dot(self.J, euler_acc_c) - np.cross(self.ang_vel, np.dot(self.J, self.ang_vel))
-        rpm = self._u2rpm(u1, u2)
-        thrust = (rpm**2) * self.KF
+        euler_acc_c = self._euler_vel_pid(euler_vel_c, self.rpy_vel) * self.DEG2RAD
+        # euler_acc_c = self._euler_vel_pid(euler_vel_c, self.rpy_vel)
+        u2 = np.dot(self.J, euler_acc_c) + np.cross(self.rpy_vel, np.dot(self.J, self.rpy_vel))
+        thrust = self._calculate_motor_thrusts(u1, u2[0], u2[1], u2[2])
+        # thrust = self._calculate_motor_thrusts(u1, euler_acc_c[0], euler_acc_c[1], euler_acc_c[2])
 
+        rpy_vel = np.array(self.rpy_vel)
         self.euler_log.append([self.rpy, euler_c])
-        self.euler_vel_log.append([self.ang_vel, euler_vel_c])
+        self.euler_vel_log.append([rpy_vel * self.RAD2DEG, euler_vel_c])
         return thrust
 
     def _euler_pid(self, euler_c, rpy):
@@ -125,38 +129,42 @@ class Quadrotor:
         e = (euler_c - rpy) * self.RAD2DEG
         return np.clip(self.euler_Kp * e, -self.euler_vel_MAX, self.euler_vel_MAX)
 
-    def _euler_vel_pid(self, euler_vel_c, ang_vel):
-        ang_vel = np.array(ang_vel)
-        error = euler_vel_c - (ang_vel * self.RAD2DEG)
+    def _euler_vel_pid(self, euler_vel_c, rpy_vel):
+        rpy_vel = np.array(rpy_vel)
+        error = euler_vel_c - (rpy_vel * self.RAD2DEG)
+        # error = euler_vel_c * self.DEG2RAD - rpy_vel
         self.euler_vel_integral += error
-        self.euler_vel_integral = np.clip(self.euler_vel_integral, -self.euler_vel_integral_LIM, self.euler_vel_integral_LIM)
+        # self.euler_vel_integral = np.clip(self.euler_vel_integral, -self.euler_vel_integral_LIM, self.euler_vel_integral_LIM)
         derivative = error - self.euler_vel_prev_error
         self.euler_vel_prev_error = error
-        return self.euler_vel_K * (self.euler_vel_Kp * error + self.euler_vel_Ki * self.euler_vel_integral + self.euler_vel_Kd * derivative)
-    
-    def _u2rpm(self, u1, u2):
+        # return self.euler_vel_K * (self.euler_vel_Kp * error + self.euler_vel_Ki * self.euler_vel_integral + self.euler_vel_Kd * derivative)
+        return np.clip(self.euler_vel_K * (self.euler_vel_Kp * error + self.euler_vel_Ki * self.euler_vel_integral + self.euler_vel_Kd * derivative), -self.euler_vel_MAX, self.euler_vel_MAX)
+
+    def _calculate_motor_thrusts(self, total_thrust, roll_control, pitch_control, yaw_control):
         # u1 = KF * (rpm1**2 + rpm2**2 + rpm3**2 + rpm4**2)
         # u2[0] = L * KF * (rpm2**2 - rpm4**2)
         # u2[1] = L * KF * (rpm3**2 - rpm1**2)
         # u2[2] = KM * (rpm1**2 - rpm2**2 + rpm3**2 - rpm4**2)
-        term1 = u1 / self.KF
-        term2 = u2[2] / self.KM
-        term3_roll = 2 * u2[0] / (self.L * self.KF)
-        term3_pitch = 2 * u2[1] / (self.L * self.KF)
 
-        rpm1 = np.sqrt(np.clip((term1 + term2 - term3_pitch) / 4, 0, None))
-        rpm2 = np.sqrt(np.clip((term1 - term2 + term3_roll) / 4, 0, None))
-        rpm3 = np.sqrt(np.clip((term1 + term2 + term3_pitch) / 4, 0, None))
-        rpm4 = np.sqrt(np.clip((term1 - term2 - term3_roll) / 4, 0, None))
-        return np.array([rpm1, rpm2, rpm3, rpm4])
+        l = self.L
+        mix_matrix = np.array([
+            [1,  1,  1,  1],
+            [0,  l,  0, -l],
+            [-l, 0,  l,  0],
+            [self.KM/self.KF, -self.KM/self.KF, self.KM/self.KF, -self.KM/self.KF]
+        ])
+        thrust_vector = np.array([total_thrust, roll_control, pitch_control, yaw_control])
 
+        motor_thrusts = np.dot(np.linalg.inv(mix_matrix), thrust_vector)
 
+        return motor_thrusts
+    
     def plot_euler_and_vel(self):
         rpy_log = np.array([log[0] for log in self.euler_log])
         euler_c_log = np.array([log[1] for log in self.euler_log])
         
-        # Extract ang_vel and euler_vel_c from euler_vel_log
-        ang_vel_log = np.array([log[0] for log in self.euler_vel_log])
+        # Extract rpy_vel and euler_vel_c from euler_vel_log
+        rpy_vel_log = np.array([log[0] for log in self.euler_vel_log])
         euler_vel_c_log = np.array([log[1] for log in self.euler_vel_log])
 
         time_steps = range(len(rpy_log))
@@ -181,10 +189,10 @@ class Quadrotor:
         axs[0, 1].set_ylabel('Euler Angle Commands (degrees)')
         axs[0, 1].legend()
 
-        # Plot ang_vel
-        axs[1, 0].plot(time_steps, ang_vel_log[:, 0], label='Angular Velocity X')
-        axs[1, 0].plot(time_steps, ang_vel_log[:, 1], label='Angular Velocity Y')
-        axs[1, 0].plot(time_steps, ang_vel_log[:, 2], label='Angular Velocity Z')
+        # Plot rpy_vel
+        axs[1, 0].plot(time_steps, rpy_vel_log[:, 0], label='Angular Velocity X')
+        axs[1, 0].plot(time_steps, rpy_vel_log[:, 1], label='Angular Velocity Y')
+        axs[1, 0].plot(time_steps, rpy_vel_log[:, 2], label='Angular Velocity Z')
         axs[1, 0].set_title('Angular Velocities Over Time')
         axs[1, 0].set_xlabel('Time Step')
         axs[1, 0].set_ylabel('Angular Velocities (degrees/sec)')
@@ -198,6 +206,18 @@ class Quadrotor:
         axs[1, 1].set_xlabel('Time Step')
         axs[1, 1].set_ylabel('Euler Angular Velocity Commands (degrees/sec)')
         axs[1, 1].legend()
+
+        # Plot error ( euler_vel_c - rpy_vel )
+        error = euler_vel_c_log - rpy_vel_log
+        fig, ax = plt.subplots()
+        ax.plot(time_steps, error[:, 0], label='Error X')
+        ax.plot(time_steps, error[:, 1], label='Error Y')
+        ax.plot(time_steps, error[:, 2], label='Error Z')
+        ax.set_title('Error Over Time')
+        ax.set_xlabel('Time Step')
+        ax.set_ylabel('Error (degrees/sec)')
+        ax.legend()
+        
 
         plt.tight_layout()
         plt.show()
@@ -261,6 +281,10 @@ class Quadrotor:
         self.rpy = pybullet.getEulerFromQuaternion(self.quat)
 
         self.vel, self.ang_vel = pybullet.getBaseVelocity(self.my_quadrotor, physicsClientId=self.PYB_CLIENT)
+
+        R_wb = np.array(pybullet.getMatrixFromQuaternion(self.quat)).reshape(3, 3)
+        R_bw = R_wb.T
+        self.rpy_vel = R_bw @ self.ang_vel
     
     def get_base_position(self):
         pos, _ = pybullet.getBasePositionAndOrientation(self.my_quadrotor, physicsClientId=self.PYB_CLIENT)

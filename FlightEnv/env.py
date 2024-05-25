@@ -238,7 +238,7 @@ class FlightEnv(gym.Env):
         # action = np.ones(self.action_dim) * self.quadrotor.MASS * self.GRAVITY_ACC / self.action_dim
         
         #### euler action space ####
-        # action = np.zeros(self.action_dim)
+        action = np.zeros(self.action_dim)
         #### euler action space ####
         rpm = self._preprocess_action(action)
         self.quadrotor.step(rpm)
@@ -368,13 +368,10 @@ class FlightEnv(gym.Env):
             (Image.fromarray(temp)).save(os.path.join(path,"frame_"+str(frame_num)+".png"))
 
     def _get_observation(self):
-        R_wb = np.array(pybullet.getMatrixFromQuaternion(self.quadrotor.quat)).reshape(3, 3)
-        R_bw = R_wb.T
-        ang_vel_b = R_bw @ self.quadrotor.ang_vel
         self._state = np.hstack([self.quadrotor.pos[0], self.quadrotor.vel[0],
                                        self.quadrotor.pos[1], self.quadrotor.vel[1],
                                        self.quadrotor.pos[2], self.quadrotor.vel[2],
-                                       self.quadrotor.rpy, ang_vel_b]).reshape((self.state_dim,))
+                                       self.quadrotor.rpy, self.quadrotor.rpy_vel]).reshape((self.state_dim,))
         # print(np.array(self.quadrotor.rpy)*180/np.pi)
         # extend observation with horizon
         obs = deepcopy(self._state)
@@ -428,6 +425,12 @@ class FlightEnv(gym.Env):
                 self._out_of_bounds = False
             terminated = True
         if terminated and self._is_render:
+
+            #### euler action space ####
+            # plot action with env step
+            self.quadrotor.plot_euler_and_vel()
+            #### euler action space ####
+
             self._debug_fig, (ax, axv) = plt.subplots(1, 2, figsize=(12, 6), subplot_kw={'projection': '3d'})
 
             # Plotting on the first subplot (ax)
@@ -456,11 +459,6 @@ class FlightEnv(gym.Env):
             plt.xlabel('Env Step')
             plt.ylabel('Reward')
             plt.show()
-
-            #### euler action space ####
-            # plot action with env step
-            self.quadrotor.plot_euler_and_vel()
-            #### euler action space ####
 
         return terminated
     
