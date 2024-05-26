@@ -238,7 +238,8 @@ class FlightEnv(gym.Env):
         # action = np.ones(self.action_dim) * self.quadrotor.MASS * self.GRAVITY_ACC / self.action_dim
         
         #### euler action space ####
-        action = np.zeros(self.action_dim)
+        #action = np.zeros(self.action_dim)
+        action = np.array([0.4*self.quadrotor.GRAVITY_ACC, 0, 30*np.pi/180, 0])
         #### euler action space ####
         rpm = self._preprocess_action(action)
         self.quadrotor.step(rpm)
