@@ -56,10 +56,10 @@ class Quadrotor:
         #### euler action space ####
         # roll, pitch, yaw in DEGREE
         # self.euler_Kp = np.array([8.0, 8.0, 4.0])
-        self.euler_Kp = np.array([10.0, 10.0, 4.0])
+        self.euler_Kp = np.array([11.0, 11.0, 8.0])
 
-        self.euler_vel_Kp = np.array([0.35, 0.35, -0.2]) * 180
-        self.euler_vel_Kd = np.array([0.004, 0.004, -0.002]) * 10
+        self.euler_vel_Kp = np.array([0.35, 0.35, -1.0]) * 160
+        self.euler_vel_Kd = np.array([0.004, 0.004, -0.002]) * 8
         # self.euler_vel_Ki = np.array([0.1, 0.1, -0.1])
         self.euler_vel_Ki = np.array([0.1, 0.1, -0.1])
         self.euler_vel_K = np.array([0.7, 0.7, 0.5])
@@ -118,6 +118,7 @@ class Quadrotor:
         u1 = u1[2]
         euler_c = action[1:4]
         euler_vel_c = self._euler_pid(euler_c, self.rpy)
+        # euler_vel_c = np.array([50, 50, 50])
         euler_acc_c = self._euler_vel_pid(euler_vel_c, self.rpy_vel) * self.DEG2RAD
         # euler_acc_c = self._euler_vel_pid(euler_vel_c, self.rpy_vel)
         u2 = np.dot(self.J, euler_acc_c) + np.cross(self.rpy_vel, np.dot(self.J, self.rpy_vel))

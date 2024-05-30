@@ -44,6 +44,7 @@ class FlightEnv(gym.Env):
                  reward_state_ang_vel_weight=0.01,
                  reward_action_weight=0.001,
                  reward_exponential=False,
+                 reward_last_action=1,
                  is_domain_randomization=True,
                  goal_horizon=5,
                  last_horizon=1,
@@ -131,6 +132,8 @@ class FlightEnv(gym.Env):
         action_low, action_high = self._set_action()
         self.action_bounds = np.array([action_low, action_high])
         self.action_space = gym.spaces.Box(low=action_low, high=action_high, dtype=np.float32)
+        self._last_action = np.zeros(self.action_dim)
+        self._reward_last_action = reward_last_action
 
         # State space: 12 states (no goal horizon)
         # Observation space: 12 states * horizon = {x, x_dot, y, y_dot, z, z_dot, phi, theta, psi, p_body, q_body, r_body}        
@@ -164,7 +167,7 @@ class FlightEnv(gym.Env):
         # return generate_line(episode_len_sec=episode_len_sec, sample_time=sample_time)
         # return generate_uniform_line(episode_len_sec=episode_len_sec, sample_time=sample_time)
         # return generate_hover(episode_len_sec=episode_len_sec, sample_time=sample_time)
-        average_speed = 1.5
+        average_speed = 0.4
         pos, vel, acc = load_trajectory(episode_len_sec=episode_len_sec, sample_time=sample_time, average_speed=average_speed, num_files=1000)
         return pos, vel, acc
 
@@ -238,8 +241,8 @@ class FlightEnv(gym.Env):
         # action = np.ones(self.action_dim) * self.quadrotor.MASS * self.GRAVITY_ACC / self.action_dim
         
         #### euler action space ####
-        #action = np.zeros(self.action_dim)
-        action = np.array([0.4*self.quadrotor.GRAVITY_ACC, 0, 30*np.pi/180, 0])
+        # action = np.zeros(self.action_dim)
+        # action = np.array([0, 10*np.pi/180, 10*np.pi/180, 30*np.pi/180])
         #### euler action space ####
         rpm = self._preprocess_action(action)
         self.quadrotor.step(rpm)
@@ -249,7 +252,7 @@ class FlightEnv(gym.Env):
         reward = self._get_reward(raw_action)
         terminated = self._get_ternimated()
         if self._out_of_bounds:
-            reward -= 30
+            reward -= 500
         info = self._get_info()
         truncated = False
         if self._is_render:
@@ -264,6 +267,7 @@ class FlightEnv(gym.Env):
                                     frame_num=int(self._env_step_counter/self._fov_img_freq)
                                     )
         # print("reward: ", reward)
+        self._last_action = action
         return obs, reward, terminated, truncated, info
 
     def render(self, mode="rgb_array", close=False):
@@ -404,6 +408,11 @@ class FlightEnv(gym.Env):
         dist = np.sum(state_error @ self._reward_state_Q @ state_error) + self._reward_action_weight * np.sum(action_error**2)
         reward = -dist
 
+        # last action reward
+        if self._env_step_counter > 0:
+            action_diff = raw_action - self._last_action
+            reward -= self._reward_last_action * np.sum(action_diff**2)
+
         if self._reward_exponential:
             reward = np.exp(reward)
         return reward
@@ -422,6 +431,7 @@ class FlightEnv(gym.Env):
         if terminated:
             self._out_of_bounds = True
         if self._env_step_counter >= self._episode_len_sec / self._time_step:
+        # if self._env_step_counter >= 100:
             if not terminated:
                 self._out_of_bounds = False
             terminated = True
