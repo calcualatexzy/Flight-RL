@@ -56,13 +56,25 @@ class Quadrotor:
         #### euler action space ####
         # roll, pitch, yaw in DEGREE
         # self.euler_Kp = np.array([8.0, 8.0, 4.0])
+        # self.euler_Kp = np.array([11.0, 11.0, 8.0])
+
+        # self.euler_vel_Kp = np.array([0.35, 0.35, -1.0]) * 160
+        # self.euler_vel_Kd = np.array([0.004, 0.004, -0.002]) * 8
+        # # self.euler_vel_Ki = np.array([0.1, 0.1, -0.1])
+        # self.euler_vel_Ki = np.array([0.1, 0.1, -0.1])
+        # self.euler_vel_K = np.array([0.7, 0.7, 0.5])
+        # self.euler_vel_MAX = np.array([1600.0, 1600.0, 1000.0])
+        # self.euler_vel_integral = 0.0
+        # self.euler_vel_integral_LIM = np.array([0.3, 0.3, 0.3])
+        # self.euler_vel_prev_error = 0.0
+
+        ### A
         self.euler_Kp = np.array([11.0, 11.0, 8.0])
 
-        self.euler_vel_Kp = np.array([0.35, 0.35, -1.0]) * 160
-        self.euler_vel_Kd = np.array([0.004, 0.004, -0.002]) * 8
-        # self.euler_vel_Ki = np.array([0.1, 0.1, -0.1])
-        self.euler_vel_Ki = np.array([0.1, 0.1, -0.1])
-        self.euler_vel_K = np.array([0.7, 0.7, 0.5])
+        self.euler_vel_Kp = np.array([0.3, 0.3, 0.1])
+        self.euler_vel_Kd = np.array([0.004, 0.004, 0.002]) * 10
+        self.euler_vel_Ki = np.array([0.01, 0.01, 0.01])
+        self.euler_vel_K = np.array([1., 1., 1.])
         self.euler_vel_MAX = np.array([1600.0, 1600.0, 1000.0])
         self.euler_vel_integral = 0.0
         self.euler_vel_integral_LIM = np.array([0.3, 0.3, 0.3])
@@ -121,9 +133,9 @@ class Quadrotor:
         # euler_vel_c = np.array([50, 50, 50])
         euler_acc_c = self._euler_vel_pid(euler_vel_c, self.rpy_vel) * self.DEG2RAD
         # euler_acc_c = self._euler_vel_pid(euler_vel_c, self.rpy_vel)
-        u2 = np.dot(self.J, euler_acc_c) + np.cross(self.rpy_vel, np.dot(self.J, self.rpy_vel))
-        thrust = self._calculate_motor_thrusts(u1, u2[0], u2[1], u2[2])
-        # thrust = self._calculate_motor_thrusts(u1, euler_acc_c[0], euler_acc_c[1], euler_acc_c[2])
+        # u2 = np.dot(self.J, euler_acc_c) + np.cross(self.rpy_vel, np.dot(self.J, self.rpy_vel))
+        # thrust = self._calculate_motor_thrusts(u1, u2[0], u2[1], u2[2])
+        thrust = self._calculate_motor_thrusts(u1, euler_acc_c[0], euler_acc_c[1], euler_acc_c[2])
 
         rpy_vel = np.array(self.rpy_vel)
         self.euler_log.append([self.rpy, euler_c])
@@ -237,7 +249,7 @@ class Quadrotor:
         '''
         forces = np.array(rpm**2) * self.KF
         torques = np.array(rpm**2) * self.KM
-        z_torque = (-torques[0] + torques[1] - torques[2] + torques[3])
+        z_torque = (torques[0] - torques[1] + torques[2] - torques[3])
         for i in range(4):
             pybullet.applyExternalForce(self.my_quadrotor,
                                  i,

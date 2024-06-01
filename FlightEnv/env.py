@@ -242,7 +242,7 @@ class FlightEnv(gym.Env):
         
         #### euler action space ####
         # action = np.zeros(self.action_dim)
-        # action = np.array([0, 10*np.pi/180, 10*np.pi/180, 30*np.pi/180])
+        action = np.array([0, 10*np.pi/180, 10*np.pi/180, 30*np.pi/180])
         #### euler action space ####
         rpm = self._preprocess_action(action)
         self.quadrotor.step(rpm)
@@ -252,7 +252,7 @@ class FlightEnv(gym.Env):
         reward = self._get_reward(raw_action)
         terminated = self._get_ternimated()
         if self._out_of_bounds:
-            reward -= 500
+            reward -= 30
         info = self._get_info()
         truncated = False
         if self._is_render:
@@ -409,9 +409,9 @@ class FlightEnv(gym.Env):
         reward = -dist
 
         # last action reward
-        if self._env_step_counter > 0:
-            action_diff = raw_action - self._last_action
-            reward -= self._reward_last_action * np.sum(action_diff**2)
+        # if self._env_step_counter > 0:
+        #     action_diff = raw_action - self._last_action
+        #     reward -= self._reward_last_action * np.sum(action_diff**2)
 
         if self._reward_exponential:
             reward = np.exp(reward)
