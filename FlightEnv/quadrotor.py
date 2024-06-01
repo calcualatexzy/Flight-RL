@@ -124,10 +124,11 @@ class Quadrotor:
         self._step_counter += 1
 
     def euler_step(self, action):
-        R_wb = np.array(pybullet.getMatrixFromQuaternion(self.quat)).reshape(3, 3)
-        R_bw = R_wb.T
-        u1 = R_bw @ np.array([0, 0, self.MASS * (self.GRAVITY_ACC + action[0])])
-        u1 = u1[2]
+        # R_wb = np.array(pybullet.getMatrixFromQuaternion(self.quat)).reshape(3, 3)
+        # R_bw = R_wb.T
+        # u1 = R_bw @ np.array([0, 0, self.MASS * (self.GRAVITY_ACC + action[0])])
+        # u1 = u1[2]
+        u1 = action[0]
         euler_c = action[1:4]
         euler_vel_c = self._euler_pid(euler_c, self.rpy)
         # euler_vel_c = np.array([50, 50, 50])
@@ -169,11 +170,18 @@ class Quadrotor:
             [1,  1,  1,  1],
             [0,  l,  0, -l],
             [-l, 0,  l,  0],
-            [self.KM/self.KF, -self.KM/self.KF, self.KM/self.KF, -self.KM/self.KF]
+            [-self.KM/self.KF, +self.KM/self.KF, -self.KM/self.KF, +self.KM/self.KF]
         ])
         thrust_vector = np.array([total_thrust, roll_control, pitch_control, yaw_control])
 
-        motor_thrusts = np.dot(np.linalg.inv(mix_matrix), thrust_vector)
+        inv_mix_matrix = np.array([
+            [  0.25,         0.,          -3.88500389, -19.1908547],
+            [  0.25,         3.88500389,   0.,          19.1908547],
+            [  0.25,         0.,           3.88500389, -19.1908547],
+            [  0.25,        -3.88500389,   0.,          19.1908547]
+        ])
+        # motor_thrusts = np.dot(np.linalg.inv(mix_matrix), thrust_vector)
+        motor_thrusts = np.dot(inv_mix_matrix, thrust_vector)
 
         return motor_thrusts
     
@@ -249,7 +257,7 @@ class Quadrotor:
         '''
         forces = np.array(rpm**2) * self.KF
         torques = np.array(rpm**2) * self.KM
-        z_torque = (torques[0] - torques[1] + torques[2] - torques[3])
+        z_torque = (- torques[0] + torques[1] - torques[2] + torques[3])
         for i in range(4):
             pybullet.applyExternalForce(self.my_quadrotor,
                                  i,

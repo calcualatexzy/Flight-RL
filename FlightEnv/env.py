@@ -132,7 +132,7 @@ class FlightEnv(gym.Env):
         action_low, action_high = self._set_action()
         self.action_bounds = np.array([action_low, action_high])
         self.action_space = gym.spaces.Box(low=action_low, high=action_high, dtype=np.float32)
-        self._last_action = np.zeros(self.action_dim)
+        self._last_action = np.array([self.quadrotor.MASS * self.GRAVITY_ACC, 0, 0, 0])
         self._reward_last_action = reward_last_action
 
         # State space: 12 states (no goal horizon)
@@ -210,7 +210,7 @@ class FlightEnv(gym.Env):
         ]).transpose()
         # self.action_goal = np.ones(self.action_dim) * self.quadrotor.MASS * self.GRAVITY_ACC / self.action_dim
         #### euler action space ####
-        self.action_goal = np.zeros(self.action_dim)
+        self.action_goal = np.array([self.quadrotor.MASS * self.GRAVITY_ACC, 0, 0, 0])
         #### euler action space ####
         
         self._env_step_counter = 0
@@ -241,8 +241,8 @@ class FlightEnv(gym.Env):
         # action = np.ones(self.action_dim) * self.quadrotor.MASS * self.GRAVITY_ACC / self.action_dim
         
         #### euler action space ####
-        # action = np.zeros(self.action_dim)
-        action = np.array([0, 10*np.pi/180, 10*np.pi/180, 30*np.pi/180])
+        # action = np.array([self.quadrotor.MASS * self.GRAVITY_ACC, 0.0, 0.0, 0.0])
+        # action = np.array([self.quadrotor.MASS * self.GRAVITY_ACC, 10*np.pi/180, 10*np.pi/180, 30*np.pi/180])
         #### euler action space ####
         rpm = self._preprocess_action(action)
         self.quadrotor.step(rpm)
@@ -506,13 +506,13 @@ class FlightEnv(gym.Env):
         # return np.full(self.action_dim, action_low, np.float32), np.full(self.action_dim, action_high, np.float32)
 
         #### euler action space ####
-        acc_threshold = self.GRAVITY_ACC * 3
+        total_thrust_threshold = self.quadrotor.MASS * self.GRAVITY_ACC * 3
         phi_threshold_radians = 85 * math.pi / 180
         theta_threshold_radians = 85 * math.pi / 180
         psi_threshold_radians = 180 * math.pi / 180  # Do not bound yaw.
-        action_low = np.array([-acc_threshold, 
+        action_low = np.array([-total_thrust_threshold + self.quadrotor.MASS * self.GRAVITY_ACC, 
                                -phi_threshold_radians, -theta_threshold_radians, -psi_threshold_radians])
-        action_high = np.array([acc_threshold, 
+        action_high = np.array([total_thrust_threshold + self.quadrotor.MASS * self.GRAVITY_ACC, 
                                 phi_threshold_radians, theta_threshold_radians, psi_threshold_radians])
         return action_low, action_high
         #### euler action space ####
