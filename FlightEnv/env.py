@@ -42,9 +42,10 @@ class FlightEnv(gym.Env):
                  reward_state_vel_weight=0.02,
                  reward_state_attitude_weight=0.5,
                  reward_state_ang_vel_weight=0.01,
-                 reward_action_weight=0.001,
+                 reward_action_thrust_weight=1,
+                 reward_action_rpy_weight=0.001,
                  reward_exponential=False,
-                 reward_last_action=1,
+                 reward_last_action=10,
                  is_domain_randomization=True,
                  goal_horizon=5,
                  last_horizon=1,
@@ -126,7 +127,12 @@ class FlightEnv(gym.Env):
             reward_state_ang_vel_weight, reward_state_ang_vel_weight, reward_state_ang_vel_weight
         ])
 
-        self._reward_action_weight = reward_action_weight
+        self._reward_action_Q = np.diag([
+            reward_action_thrust_weight,
+            reward_action_rpy_weight,
+            reward_action_rpy_weight,
+            reward_action_rpy_weight
+        ])
         self._reward_exponential = reward_exponential
 
         action_low, action_high = self._set_action()
@@ -241,10 +247,14 @@ class FlightEnv(gym.Env):
         # action = np.ones(self.action_dim) * self.quadrotor.MASS * self.GRAVITY_ACC / self.action_dim
         
         #### euler action space ####
-        # action = np.array([self.quadrotor.MASS * self.GRAVITY_ACC, 0.0, 0.0, 0.0])
-        # action = np.array([self.quadrotor.MASS * self.GRAVITY_ACC, 10*np.pi/180, 10*np.pi/180, 30*np.pi/180])
+        # action = np.array([0., -1.4835298, 0.19656561, 0.27414256])
+        # action = np.array([1.1 * self.quadrotor.MASS * self.GRAVITY_ACC, 0., 0., 0.])
         #### euler action space ####
+        # print(f"mg: {self.quadrotor.MASS * self.GRAVITY_ACC}")
+        # print(f"action: {action}")
+        # print(f"last action: {self._last_action}")
         rpm = self._preprocess_action(action)
+        # print(f"rpm: {rpm}")
         self.quadrotor.step(rpm)
         self._env_step_counter += 1
         # print(self._env_step_counter)
@@ -405,13 +415,13 @@ class FlightEnv(gym.Env):
         # print("step: ", self._env_step_counter)
         # print("state: ", self._state)
         # print("goal: ", self.state_goal[wp_idx])
-        dist = np.sum(state_error @ self._reward_state_Q @ state_error) + self._reward_action_weight * np.sum(action_error**2)
+        dist = np.sum(state_error @ self._reward_state_Q @ state_error) + np.sum(action_error @ self._reward_action_Q @ action_error)
         reward = -dist
 
         # last action reward
-        # if self._env_step_counter > 0:
-        #     action_diff = raw_action - self._last_action
-        #     reward -= self._reward_last_action * np.sum(action_diff**2)
+        if self._env_step_counter > 0:
+            action_diff = raw_action - self._last_action
+            reward -= self._reward_last_action * np.sum(action_diff**2)
 
         if self._reward_exponential:
             reward = np.exp(reward)
@@ -506,13 +516,13 @@ class FlightEnv(gym.Env):
         # return np.full(self.action_dim, action_low, np.float32), np.full(self.action_dim, action_high, np.float32)
 
         #### euler action space ####
-        total_thrust_threshold = self.quadrotor.MASS * self.GRAVITY_ACC * 3
+        total_thrust_threshold = self.quadrotor.MASS * self.GRAVITY_ACC * 5
         phi_threshold_radians = 85 * math.pi / 180
         theta_threshold_radians = 85 * math.pi / 180
         psi_threshold_radians = 180 * math.pi / 180  # Do not bound yaw.
-        action_low = np.array([-total_thrust_threshold + self.quadrotor.MASS * self.GRAVITY_ACC, 
+        action_low = np.array([0, 
                                -phi_threshold_radians, -theta_threshold_radians, -psi_threshold_radians])
-        action_high = np.array([total_thrust_threshold + self.quadrotor.MASS * self.GRAVITY_ACC, 
+        action_high = np.array([25., 
                                 phi_threshold_radians, theta_threshold_radians, psi_threshold_radians])
         return action_low, action_high
         #### euler action space ####
