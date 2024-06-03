@@ -163,7 +163,7 @@ class FlightEnv(gym.Env):
         # return generate_uniform_line(episode_len_sec=episode_len_sec, sample_time=sample_time)
         # return generate_hover(episode_len_sec=episode_len_sec, sample_time=sample_time)
         average_speed = 1.5
-        pos, vel, acc = load_trajectory(episode_len_sec=episode_len_sec, sample_time=sample_time, average_speed=average_speed, num_files=1000)
+        pos, vel, acc = load_trajectory(episode_len_sec=episode_len_sec, sample_time=sample_time, average_speed=average_speed, num_files=3)
         return pos, vel, acc
 
     def reset(self, seed=None, options=None):

@@ -135,10 +135,11 @@ def save_trajectory(cnt, trajectory_points, velocities, accelerations):
     #np.savez(f'FlightEnv/TrajLib/traj_200Hz_len5_vel1.5/{cnt}.npz', trajectory_points=trajectory_points, velocities=velocities, accelerations=accelerations)
     np.savez(f'FlightEnv/TrajLib/traj_200Hz_len5_vel1.5/{cnt}.npz', trajectory_points=trajectory_points, velocities=velocities, accelerations=accelerations)
 
-def load_trajectory(episode_len_sec, sample_time, average_speed, num_files=100):
+def load_trajectory(episode_len_sec, sample_time, average_speed, num_files=3):
     # from the episode length and sample time, get the folder name
     freq = int(1/sample_time)
-    folder_name = f'FlightEnv/TrajLib/traj_{freq}Hz_len{episode_len_sec}_vel{average_speed}/'
+    # folder_name = f'FlightEnv/TrajLib/traj_{freq}Hz_len{episode_len_sec}_vel{average_speed}/'
+    folder_name = f'FlightEnv/TrajLib/traj_eight/'
     file_num = np.random.randint(num_files)
     # file_num = 0
     data = np.load(f'{folder_name}{file_num}.npz')
