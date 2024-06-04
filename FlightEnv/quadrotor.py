@@ -58,12 +58,13 @@ class Quadrotor:
         # self.euler_Kp = np.array([8.0, 8.0, 4.0])
         self.euler_Kp = np.array([8.0, 8.0, 5.0])
 
-        self.euler_vel_Kp = np.array([150, 150, 200])
-        self.euler_vel_Kd = np.array([0.01, 0.01, 0.01])
+        self.euler_vel_Kp = np.array([80, 80, 150])
+        # self.euler_vel_Kp = np.array([300, 170, 200])
+        self.euler_vel_Kd = np.array([1, 1, 1])
         # self.euler_vel_Ki = np.array([0.1, 0.1, -0.1])
-        self.euler_vel_Ki = np.array([0.05, 0.05, 0.05])
+        self.euler_vel_Ki = np.array([2, 2, 2])
         self.euler_vel_K = np.array([1., 1., 1.])
-        self.euler_vel_MAX = np.array([1600.0, 1600.0, 1000.0])
+        self.euler_vel_MAX = np.array([500.0, 500.0, 600.0])
         self.euler_vel_integral = 0.0
         self.euler_vel_integral_LIM = np.array([0.3, 0.3, 0.3])
         self.euler_vel_prev_error = 0.0
@@ -128,9 +129,11 @@ class Quadrotor:
         # R_bw = R_wb.T
         # u1 = R_bw @ np.array([0, 0, self.MASS * (self.GRAVITY_ACC + action[0])])
         # u1 = u1[2]
-        u1 = action[0]
-        euler_c = action[1:4]
-        euler_vel_c = self._euler_pid(euler_c, self.rpy)
+        # denormalize action to accelerator
+        u1 = action[0] * self.THRUST2WEIGHT_RATIO * self.GRAVITY
+        euler_vel_c = action[1:4] * 200 - 100
+        # euler_c = action[1:4]
+        # euler_vel_c = self._euler_pid(euler_c, self.rpy)
         # euler_vel_c = np.array([50, 50, 50])
         euler_acc_c = self._euler_vel_pid(euler_vel_c, self.rpy_vel) * self.DEG2RAD
         # euler_acc_c = self._euler_vel_pid(euler_vel_c, self.rpy_vel)
@@ -139,7 +142,8 @@ class Quadrotor:
         # thrust = self._calculate_motor_thrusts(u1, euler_acc_c[0], euler_acc_c[1], euler_acc_c[2])
 
         rpy_vel = np.array(self.rpy_vel)
-        self.euler_log.append([self.rpy, euler_c])
+        self.euler_log.append([self.rpy, self.rpy])
+        # self.euler_log.append([self.rpy, euler_c])
         self.euler_vel_log.append([rpy_vel * self.RAD2DEG, euler_vel_c])
         return thrust
 
@@ -157,7 +161,7 @@ class Quadrotor:
         derivative = error - self.euler_vel_prev_error
         self.euler_vel_prev_error = error
         # return self.euler_vel_K * (self.euler_vel_Kp * error + self.euler_vel_Ki * self.euler_vel_integral + self.euler_vel_Kd * derivative)
-        return np.clip(self.euler_vel_K * (self.euler_vel_Kp * error + self.euler_vel_Ki * self.euler_vel_integral + self.euler_vel_Kd * derivative), -self.euler_vel_MAX, self.euler_vel_MAX)
+        return self.euler_vel_K * (self.euler_vel_Kp * error + self.euler_vel_Ki * self.euler_vel_integral + self.euler_vel_Kd * derivative)
 
     def _calculate_motor_thrusts(self, total_thrust, roll_control, pitch_control, yaw_control):
         # u1 = KF * (rpm1**2 + rpm2**2 + rpm3**2 + rpm4**2)

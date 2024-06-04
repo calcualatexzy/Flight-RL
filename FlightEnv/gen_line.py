@@ -47,7 +47,7 @@ def generate_uniform_line(episode_len_sec=10, sample_time=0.01):
     return waypoints, velocities, accelerations, eulers
 
 def generate_hover(episode_len_sec=10, sample_time=0.01):
-    p_init = np.array([0, 0, 0.5])
+    p_init = np.array([2, 2, 0.5])
     v_init = np.array([0, 0, 0])
     a_init = np.array([0, 0, 0])
     
@@ -58,9 +58,9 @@ def generate_hover(episode_len_sec=10, sample_time=0.01):
     p_hover = np.tile(p_init, (num_waypoints, 1))
 
     # Calculate Euler angles (assuming hovering)
-    eulers = np.zeros((num_waypoints, 3))
+    # eulers = np.zeros((num_waypoints, 3))
 
-    return p_hover, v_hover, a_hover, eulers
+    return p_hover, v_hover, a_hover
 
 
 if __name__ == "__main__":

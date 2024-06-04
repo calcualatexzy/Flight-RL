@@ -20,7 +20,29 @@ from FlightEnv.quadrotor import Quadrotor, Physics
 from FlightEnv.gen_traj import generate_trajectory
 from FlightEnv.gen_line import generate_line, generate_uniform_line, generate_hover
 from FlightEnv.optim_gen_traj import load_trajectory
+class ActionFilter:
+    def __init__(self, alpha=0.9):
+        """
+        alpha (float)
+        """
+        self.alpha = alpha
+        self.previous_action = None
 
+    def filter(self, action):
+        if self.previous_action is None:
+            # 如果没有前一个动作，则直接返回当前动作
+            filtered_action = action
+        else:
+            # 使用加权移动平均公式进行滤波
+            filtered_action = self.alpha * action + (1 - self.alpha) * self.previous_action
+
+        # 更新前一个动作
+        self.previous_action = filtered_action
+
+        return filtered_action
+    
+    def clear(self):
+        self.previous_action = None
 class ImageType(Enum):
     """Camera capture image type enumeration class."""
 
@@ -41,14 +63,14 @@ class FlightEnv(gym.Env):
                  reward_state_pos_z_weight=1,
                  reward_state_vel_weight=0.02,
                  reward_state_attitude_weight=0.5,
-                 reward_state_ang_vel_weight=0.01,
+                 reward_state_ang_vel_weight=0.1,
                  reward_action_thrust_weight=1,
-                 reward_action_rpy_weight=0.001,
+                 reward_action_rpy_weight=1,
                  reward_exponential=False,
-                 reward_last_action=10,
+                 reward_last_action=0.0,
                  is_domain_randomization=True,
-                 goal_horizon=5,
-                 last_horizon=1,
+                 goal_horizon=10,
+                 last_horizon=5,
                  episode_len_sec=5,
                  ctrl_freq = 200,
                  pybullet_freq = 600,
@@ -82,6 +104,8 @@ class FlightEnv(gym.Env):
         self._pybullet_time_step = 1. / pybullet_freq
         self._pybullet_steps_per_ctrl = int(pybullet_freq / ctrl_freq)
         self._fov_img_freq = fov_img_freq
+
+        self._action_filter = ActionFilter(alpha=0.8)
 
         self._is_domain_randomization = is_domain_randomization
 
@@ -138,7 +162,9 @@ class FlightEnv(gym.Env):
         action_low, action_high = self._set_action()
         self.action_bounds = np.array([action_low, action_high])
         self.action_space = gym.spaces.Box(low=action_low, high=action_high, dtype=np.float32)
-        self._last_action = np.array([self.quadrotor.MASS * self.GRAVITY_ACC, 0, 0, 0])
+        # self._last_action = np.array([self.quadrotor.MASS * self.GRAVITY_ACC, 0, 0, 0])
+        self._last_action = np.array([1. / self.quadrotor.THRUST2WEIGHT_RATIO, 0.5, 0.5, 0.5])
+        self._last_last_action = np.array([1. / self.quadrotor.THRUST2WEIGHT_RATIO, 0.5, 0.5, 0.5])
         self._reward_last_action = reward_last_action
 
         # State space: 12 states (no goal horizon)
@@ -216,7 +242,11 @@ class FlightEnv(gym.Env):
         ]).transpose()
         # self.action_goal = np.ones(self.action_dim) * self.quadrotor.MASS * self.GRAVITY_ACC / self.action_dim
         #### euler action space ####
-        self.action_goal = np.array([self.quadrotor.MASS * self.GRAVITY_ACC, 0, 0, 0])
+        # self.action_goal = np.array([self.quadrotor.MASS * self.GRAVITY_ACC, 0, 0, 0])
+        self.action_goal = np.array([1. / self.quadrotor.THRUST2WEIGHT_RATIO, 0.5, 0.5, 0.5])
+        self._last_action = np.array([1. / self.quadrotor.THRUST2WEIGHT_RATIO, 0.5, 0.5, 0.5])
+        self._last_last_action = np.array([1. / self.quadrotor.THRUST2WEIGHT_RATIO, 0.5, 0.5, 0.5])
+        self._action_filter = ActionFilter(alpha=0.8)
         #### euler action space ####
         
         self._env_step_counter = 0
@@ -243,15 +273,24 @@ class FlightEnv(gym.Env):
           done: Whether the episode has ended.
           info: A dictionary that stores diagnostic information.
         """
+        # action = self._action_filter.filter(action)
         raw_action = action
         # action = np.ones(self.action_dim) * self.quadrotor.MASS * self.GRAVITY_ACC / self.action_dim
         
         #### euler action space ####
+        # action = np.array([1. / self.quadrotor.THRUST2WEIGHT_RATIO + 0.05 * (self._env_step_counter // 100), 
+        #                    0.5 + 0.05 * (self._env_step_counter // 100), 
+        #                    0.5 + 0.05 * (self._env_step_counter // 100), 
+        #                    0.5 + 0.05 * (self._env_step_counter // 100)])
         # action = np.array([0., -1.4835298, 0.19656561, 0.27414256])
-        # action = np.array([1.1 * self.quadrotor.MASS * self.GRAVITY_ACC, 0., 0., 0.])
+        # action = np.array([1. / self.quadrotor.THRUST2WEIGHT_RATIO, 1., 0.5, 0.5])
+        # if self._env_step_counter > 100:
+        #     action = np.array([1. / self.quadrotor.THRUST2WEIGHT_RATIO * 2, 0, 0.5, 0.5])
+        # action = np.array([0.51, 0.5, 0.7, 0.7])
         #### euler action space ####
         # print(f"mg: {self.quadrotor.MASS * self.GRAVITY_ACC}")
         # print(f"action: {action}")
+        # print(f"action goal: {self.action_goal}")
         # print(f"last action: {self._last_action}")
         rpm = self._preprocess_action(action)
         # print(f"rpm: {rpm}")
@@ -262,7 +301,7 @@ class FlightEnv(gym.Env):
         reward = self._get_reward(raw_action)
         terminated = self._get_ternimated()
         if self._out_of_bounds:
-            reward -= 30
+            reward -= (1000 - self._env_step_counter) * 0.3
         info = self._get_info()
         truncated = False
         if self._is_render:
@@ -277,6 +316,7 @@ class FlightEnv(gym.Env):
                                     frame_num=int(self._env_step_counter/self._fov_img_freq)
                                     )
         # print("reward: ", reward)
+        self._last_last_action = self._last_action
         self._last_action = action
         return obs, reward, terminated, truncated, info
 
@@ -418,10 +458,9 @@ class FlightEnv(gym.Env):
         dist = np.sum(state_error @ self._reward_state_Q @ state_error) + np.sum(action_error @ self._reward_action_Q @ action_error)
         reward = -dist
 
-        # last action reward
-        if self._env_step_counter > 0:
-            action_diff = raw_action - self._last_action
-            reward -= self._reward_last_action * np.sum(action_diff**2)
+        # mid_range = np.array([1. / self.quadrotor.THRUST2WEIGHT_RATIO, 0.5, 0.5, 0.5])
+        # mid_range_bonus = np.exp(-np.sum((action - mid_range)**2))
+        # reward += np.sum(mid_range_bonus)
 
         if self._reward_exponential:
             reward = np.exp(reward)
@@ -500,6 +539,7 @@ class FlightEnv(gym.Env):
 
         #### euler action space ####
         action = self.quadrotor.euler_step(action)
+        # return action
         #### euler action space ####
 
         rpm = self.quadrotor.thrust2rpm(action)
@@ -516,14 +556,17 @@ class FlightEnv(gym.Env):
         # return np.full(self.action_dim, action_low, np.float32), np.full(self.action_dim, action_high, np.float32)
 
         #### euler action space ####
-        total_thrust_threshold = self.quadrotor.MASS * self.GRAVITY_ACC * 5
-        phi_threshold_radians = 85 * math.pi / 180
-        theta_threshold_radians = 85 * math.pi / 180
-        psi_threshold_radians = 180 * math.pi / 180  # Do not bound yaw.
-        action_low = np.array([0, 
-                               -phi_threshold_radians, -theta_threshold_radians, -psi_threshold_radians])
-        action_high = np.array([25., 
-                                phi_threshold_radians, theta_threshold_radians, psi_threshold_radians])
+        # total_thrust_threshold = self.quadrotor.MASS * self.GRAVITY_ACC * 5
+        # phi_threshold_radians = 85 * math.pi / 180
+        # theta_threshold_radians = 85 * math.pi / 180
+        # psi_threshold_radians = 180 * math.pi / 180  # Do not bound yaw.
+        # action_low = np.array([0, 
+        #                        -phi_threshold_radians, -theta_threshold_radians, -psi_threshold_radians])
+        # action_high = np.array([25., 
+        #                         phi_threshold_radians, theta_threshold_radians, psi_threshold_radians])
+        
+        action_low = np.array([0., 0., 0., 0.])
+        action_high = np.array([1., 1., 1., 1.])
         return action_low, action_high
         #### euler action space ####
 
