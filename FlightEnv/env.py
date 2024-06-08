@@ -199,7 +199,7 @@ class FlightEnv(gym.Env):
         # return generate_line(episode_len_sec=episode_len_sec, sample_time=sample_time)
         # return generate_uniform_line(episode_len_sec=episode_len_sec, sample_time=sample_time)
         # return generate_hover(episode_len_sec=episode_len_sec, sample_time=sample_time)
-        average_speed = 0.4
+        average_speed = 1.5
         pos, vel, acc = load_trajectory(episode_len_sec=episode_len_sec, sample_time=sample_time, average_speed=average_speed, num_files=1000)
         return pos, vel, acc
 
@@ -458,9 +458,9 @@ class FlightEnv(gym.Env):
         dist = np.sum(state_error @ self._reward_state_Q @ state_error) + np.sum(action_error @ self._reward_action_Q @ action_error)
         reward = -dist
 
-        # mid_range = np.array([1. / self.quadrotor.THRUST2WEIGHT_RATIO, 0.5, 0.5, 0.5])
-        # mid_range_bonus = np.exp(-np.sum((action - mid_range)**2))
-        # reward += np.sum(mid_range_bonus)
+        mid_range = np.array([1. / self.quadrotor.THRUST2WEIGHT_RATIO, 0.5, 0.5, 0.5])
+        mid_range_bonus = np.exp(-np.sum((action - mid_range)**2))
+        reward += np.sum(mid_range_bonus)
 
         if self._reward_exponential:
             reward = np.exp(reward)
