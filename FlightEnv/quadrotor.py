@@ -59,6 +59,7 @@ class Quadrotor:
         self.euler_Kp = np.array([8.0, 8.0, 5.0])
 
         self.euler_vel_Kp = np.array([80, 80, 150])
+        
         # self.euler_vel_Kp = np.array([300, 170, 200])
         self.euler_vel_Kd = np.array([1, 1, 1])
         # self.euler_vel_Ki = np.array([0.1, 0.1, -0.1])
@@ -69,6 +70,11 @@ class Quadrotor:
         self.euler_vel_integral_LIM = np.array([0.3, 0.3, 0.3])
         self.euler_vel_prev_error = 0.0
 
+        # self.K_rot_tensor = np.array([0.3, 0.3, 0.1])
+        # self.K_angvel_tensor = np.array([0.1, 0.1, 0.2])
+
+        self.K_rot_tensor = np.array([0.7, 0.7, 0.5])
+        self.K_angvel_tensor = np.array([0.15, 0.15, 0.25])
         ### A
         # self.euler_Kp = np.array([11.0, 11.0, 8.0])
 
@@ -124,6 +130,65 @@ class Quadrotor:
         self._update_and_store_kinematic_information()
         self._step_counter += 1
 
+    def attitude_step(self, force, torques):
+        for _ in range(self._pybullet_steps_per_ctrl):
+            pybullet.applyExternalForce(self.my_quadrotor, -1, forceObj=[0, 0, -force], posObj=[0, 0, 0], 
+                                        flags=pybullet.LINK_FRAME, physicsClientId=self.PYB_CLIENT)
+            pybullet.applyExternalTorque(self.my_quadrotor, -1, torqueObj=torques, 
+                                        flags=pybullet.LINK_FRAME, physicsClientId=self.PYB_CLIENT)
+            pybullet.stepSimulation(physicsClientId=self.PYB_CLIENT)
+        self._update_and_store_kinematic_information()
+        self._step_counter += 1
+
+    def attitude_controller(self, action):
+        
+        # Current rotation matrix
+        R_wb = np.array(pybullet.getMatrixFromQuaternion(self.quat)).reshape(3, 3)
+        R_bw = R_wb.T
+        rpy = np.array(pybullet.getEulerFromQuaternion(self.quat))
+
+        # Desired euler angle is equal to commanded roll, commanded pitch, and current yaw
+        euler_c = np.array([action[1], action[2], rpy[2]])
+        
+        # Desired rotation matrix (R_c)
+        s_pitch = np.sin(euler_c[1])
+        c_pitch = np.cos(euler_c[1])
+        s_roll = np.sin(euler_c[0])
+        c_roll = np.cos(euler_c[0])
+
+        R_c = np.array([[1.0, 0.0, -s_pitch],
+                        [0.0, c_roll, c_pitch * s_roll],
+                        [0.0, -s_roll, c_pitch * c_roll]])
+
+        # Euler angle rate (desired angular velocity)
+        rpy_vel_c = np.zeros(3)
+        rpy_vel_c[2] = action[3]
+        omega_c = np.dot(R_c, rpy_vel_c)
+        
+        # convert euler_c to rotation matrix
+        R_euler_c = np.array(pybullet.getMatrixFromQuaternion(pybullet.getQuaternionFromEuler(euler_c))).reshape(3, 3)
+        R_euler_c_T = R_euler_c.T
+
+        # Rotation error matrix
+        rot_err_mat = np.dot(R_euler_c_T, R_wb) - np.dot(R_bw, R_euler_c)
+        rot_err = 0.5 * np.array([-rot_err_mat[1, 2], rot_err_mat[0, 2], -rot_err_mat[0, 1]])
+
+        angvel_err_c = np.dot(R_bw, np.dot(R_euler_c, omega_c))
+        angvel_err_actual = np.dot(R_bw, self.ang_vel)
+
+        angvel_err = angvel_err_actual - angvel_err_c
+
+        # Control torques
+        torques = -self.K_rot_tensor * rot_err - self.K_angvel_tensor * angvel_err + np.cross(self.ang_vel, self.ang_vel)
+
+        # Thrust
+        thrust = 1 + action[0]
+        self.euler_log.append([self.rpy, self.rpy])
+        # self.euler_log.append([self.rpy, euler_c])
+        self.euler_vel_log.append([self.rpy_vel, self.rpy_vel])
+        # print(thrust, torques)
+        return thrust, torques
+    
     def euler_step(self, action):
         # R_wb = np.array(pybullet.getMatrixFromQuaternion(self.quat)).reshape(3, 3)
         # R_bw = R_wb.T

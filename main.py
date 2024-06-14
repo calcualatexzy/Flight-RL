@@ -1,5 +1,5 @@
 from FlightEnv.env import FlightEnv
-from stable_baselines3 import PPO
+from stable_baselines3 import PPO, SAC
 from stable_baselines3.common.callbacks import CheckpointCallback
 from stable_baselines3.common.vec_env import SubprocVecEnv
 from stable_baselines3.common.vec_env import VecMonitor
@@ -21,7 +21,7 @@ def train():
         # env = FlightEnv()
         policy_kargs = dict(
             activation_fn=torch.nn.Tanh,
-            net_arch=dict(pi=[128, 128, 64], vf=[128, 128, 64])
+            net_arch=dict(pi=[128, 64], vf=[128, 64])
         )
 
         model = PPO("MlpPolicy", env,
