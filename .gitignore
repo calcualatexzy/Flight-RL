@@ -1,0 +1,30 @@
+__pycache__/
+*.py[cod]
+.pytest_cache/
+runs/
+recording_*/
+.conda/
+data/trajectories_v*/
+/exports/
+
+# Local environments, credentials, coverage and generated build files.
+.venv/
+venv/
+.env
+.env.*
+!.env.example
+.coverage
+htmlcov/
+*.egg-info/
+build/
+dist/
+.DS_Store
+
+# Keep historical tracked artifacts, but do not add new training output here.
+/checkpoints/*
+!/checkpoints/.gitignore
+/temp_checkpoints/*
+!/temp_checkpoints/.gitignore
+/logs/*
+!/logs/.gitignore
+/results/

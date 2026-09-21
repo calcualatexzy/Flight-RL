@@ -135,17 +135,13 @@ def save_trajectory(cnt, trajectory_points, velocities, accelerations):
     #np.savez(f'FlightEnv/TrajLib/traj_200Hz_len5_vel1.5/{cnt}.npz', trajectory_points=trajectory_points, velocities=velocities, accelerations=accelerations)
     np.savez(f'FlightEnv/TrajLib/traj_200Hz_len5_vel1.5/{cnt}.npz', trajectory_points=trajectory_points, velocities=velocities, accelerations=accelerations)
 
-def load_trajectory(episode_len_sec, sample_time, average_speed, num_files=100):
-    # from the episode length and sample time, get the folder name
-    freq = int(1/sample_time)
-    folder_name = f'FlightEnv/TrajLib/traj_{freq}Hz_len{episode_len_sec}_vel{average_speed}/'
-    file_num = np.random.randint(num_files)
-    # file_num = 0
-    data = np.load(f'{folder_name}{file_num}.npz')
-    trajectory_points = data['trajectory_points']
-    velocities = data['velocities']
-    accelerations = data['accelerations']
-    return trajectory_points, velocities, accelerations
+def load_trajectory(episode_len_sec, sample_time, average_speed=1.5, num_files=None, rng=None):
+    """Compatibility entry point; sample real members of the bundled ZIP library."""
+    from FlightEnv.trajectories import sample_trajectory
+    if average_speed != 1.5:
+        raise ValueError("Only the bundled average_speed=1.5 trajectory library is available")
+    return sample_trajectory(episode_len_sec, sample_time,
+                             rng if rng is not None else np.random.default_rng())
 
 if __name__ == "__main__":
     episode_len_sec = 5

@@ -1,0 +1,59 @@
+{
+  "no_existing_data_or_checkpoints": true,
+  "generated_splits": [
+    2304,
+    288,
+    288
+  ],
+  "initial_timesteps": 0,
+  "train_timesteps": 256,
+  "resume_timesteps": 384,
+  "ppo_weights_updated": true,
+  "baseline_and_best_saved": true,
+  "periodic_checkpoints": 2,
+  "demo_reproduction": [
+    {
+      "family": "figure8",
+      "zero_residual": true,
+      "full_flight": true,
+      "position_rmse_m": 0.03526850534119313,
+      "matches_published_demo": true
+    },
+    {
+      "family": "helix",
+      "zero_residual": true,
+      "full_flight": true,
+      "position_rmse_m": 0.047444587923821245,
+      "matches_published_demo": true
+    },
+    {
+      "family": "vertical_loop",
+      "zero_residual": true,
+      "full_flight": true,
+      "position_rmse_m": 0.032778909131419384,
+      "matches_published_demo": true
+    },
+    {
+      "family": "lissajous",
+      "zero_residual": true,
+      "full_flight": true,
+      "position_rmse_m": 0.03969008030107742,
+      "matches_published_demo": true
+    },
+    {
+      "family": "slalom",
+      "zero_residual": true,
+      "full_flight": true,
+      "position_rmse_m": 0.027980985569609783,
+      "matches_published_demo": true
+    }
+  ],
+  "date": "2026-09-21",
+  "environment": "flight-rl / Python 3.11 / CPU",
+  "automated_tests_passed": 67,
+  "third_party_deprecation_warnings": 14,
+  "pip_check": "No broken requirements found",
+  "readme_local_links": true,
+  "gif_files": 5,
+  "gif_hashes_verified": true
+}

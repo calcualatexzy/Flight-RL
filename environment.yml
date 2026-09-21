@@ -1,0 +1,8 @@
+name: flight-rl
+channels:
+  - defaults
+dependencies:
+  - python=3.11
+  - pip
+  - pip:
+      - -r requirements-cpu.txt

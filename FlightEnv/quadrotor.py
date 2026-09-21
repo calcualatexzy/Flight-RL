@@ -1,8 +1,6 @@
 from enum import Enum
-import os
 import numpy as np
 import xml.etree.ElementTree as etxml
-import math
 import pybullet
 
 class Physics(str, Enum):
@@ -17,12 +15,13 @@ class Physics(str, Enum):
 class Quadrotor:
     def __init__(self, pybullet_client, urdf_path, pybullet_steps_per_ctrl, is_domain_randomization=False, 
                  physics_type=Physics.PYB,
-                 verbose=False):
+                 verbose=False, rng=None):
         self.PYB_CLIENT = pybullet_client
         self._urdf_path = urdf_path
         self._pybullet_steps_per_ctrl = pybullet_steps_per_ctrl
 
         self._verbose = verbose
+        self.rng = rng if rng is not None else np.random.default_rng()
         
         self._physics_type = physics_type
 
@@ -38,12 +37,6 @@ class Quadrotor:
         self.INIT_ANG_VEL = np.array([0., 0., 0.])
         self.INIT_RPY = np.array([0., 0., 0.])
 
-        if self._is_domain_randomization:
-            self.INIT_XYZ += np.random.uniform(-0.1, 0.1, size=3)
-            self.INIT_VEL += np.random.uniform(-0.1, 0.1, size=3)
-            self.INIT_ANG_VEL += np.random.uniform(-0.1, 0.1, size=3)
-            self.INIT_RPY += np.random.uniform(-0.1, 0.1, size=3)
-
         self.pos = np.zeros(3)
         self.quat = np.zeros(4)
         self.rpy = np.zeros(3)
@@ -56,27 +49,31 @@ class Quadrotor:
         self.reset(reload_urdf=True)
 
     def reset(self, reload_urdf=True):
+        self.INIT_XYZ = np.array([0., 0., 0.5])
+        self.INIT_VEL = np.zeros(3)
+        self.INIT_ANG_VEL = np.zeros(3)
+        self.INIT_RPY = np.zeros(3)
+        if self._is_domain_randomization:
+            for state in (self.INIT_XYZ, self.INIT_VEL, self.INIT_ANG_VEL, self.INIT_RPY):
+                state += self.rng.uniform(-0.1, 0.1, size=3)
+        self.load_model_param()
         if reload_urdf:
 
-            self.load_model_param()
             self.my_quadrotor = pybullet.loadURDF(self._urdf_path, self.INIT_XYZ, 
                                                   pybullet.getQuaternionFromEuler(self.INIT_RPY), 
                                                   physicsClientId=self.PYB_CLIENT)
 
-            pybullet.changeDynamics(self.my_quadrotor, -1, linearDamping=0, angularDamping=0, 
-                                    mass=self.MASS, 
-                                    localInertiaDiagonal=self.J.diagonal())
-
-            self._update_and_store_kinematic_information()
         else:
             pybullet.resetBasePositionAndOrientation(self.my_quadrotor, self.INIT_XYZ, 
                                                      pybullet.getQuaternionFromEuler(self.INIT_RPY), 
                                                      physicsClientId=self.PYB_CLIENT)
-            pybullet.resetBaseVelocity(self.my_quadrotor, self.INIT_VEL, self.INIT_ANG_VEL, 
-                                      physicsClientId=self.PYB_CLIENT)
 
-            self._update_and_store_kinematic_information()
-
+        pybullet.changeDynamics(self.my_quadrotor, -1, linearDamping=0, angularDamping=0,
+                                mass=self.MASS, localInertiaDiagonal=self.J.diagonal(),
+                                physicsClientId=self.PYB_CLIENT)
+        pybullet.resetBaseVelocity(self.my_quadrotor, self.INIT_VEL, self.INIT_ANG_VEL,
+                                  physicsClientId=self.PYB_CLIENT)
+        self._update_and_store_kinematic_information()
         self._step_counter = 0
         self.last_action = np.zeros(4)
 
@@ -86,8 +83,8 @@ class Quadrotor:
             if self._physics_type == Physics.PYB_DRAG:
                 self._drag(action)
             pybullet.stepSimulation(physicsClientId=self.PYB_CLIENT)
+            self._update_and_store_kinematic_information()
             self.last_action = action
-        self._update_and_store_kinematic_information()
         self._step_counter += 1
         
 
@@ -132,7 +129,8 @@ class Quadrotor:
         # Simple draft model applied to the base/center of mass #
         drag_factors = -1 * self.DRAG_COEFF * np.sum(
             np.array(2 * np.pi * rpm / 60))
-        drag = np.dot(base_rot, drag_factors * np.array(self.vel))
+        # vel is world-frame; LINK_FRAME requires a body-frame force.
+        drag = drag_factors * (base_rot.T @ np.asarray(self.vel))
         pybullet.applyExternalForce(self.my_quadrotor,
                              4,
                              forceObj=drag,
@@ -189,8 +187,9 @@ class Quadrotor:
 
         # domain randomization
         if self._is_domain_randomization:
-            self.MASS += np.random.uniform(-2e-3, 2e-3)
-            self.J += np.random.uniform(-5e-6, 5e-6, size=self.J.shape)
+            self.MASS *= self.rng.uniform(0.95, 1.05)
+            self.J *= self.rng.uniform(0.95, 1.05)
+            self.J_INV = np.linalg.inv(self.J)
 
         if self._verbose:
             print(

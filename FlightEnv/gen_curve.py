@@ -1,7 +1,6 @@
 #Jack curve-system 杰克曲线系
 import numpy as np
 from scipy.optimize import minimize
-from scipy.misc import derivative
 from numpy import sin, cos
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
@@ -12,10 +11,10 @@ def f(t, a, b, c, d, e, f):
 
 # Define the loss function
 def loss(x):
-    def f_adjusted(t):
-        return f(t, *x)
-    df0 = derivative(f_adjusted, 0, dx=1e-6)
-    df10 = derivative(f_adjusted, 10, dx=1e-6)
+    a, b, c, _, e, f_coef = x
+    def slope(t):
+        return a * np.log(1.1) * 1.1**t + b + 2*c*t + e*np.cos(t) - f_coef*np.sin(t)
+    df0, df10 = slope(0), slope(10)
     return df0**2 + df10**2
 
 t_values = np.linspace(0, 10, 1000)
