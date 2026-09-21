@@ -1,4 +1,4 @@
-"""Test five difficult held-out flights and export exactly five PyBullet MP4s."""
+"""Test curated difficult held-out flights and export PyBullet MP4s."""
 import argparse
 from datetime import datetime
 import hashlib
@@ -20,9 +20,10 @@ DEMOS = (
     Demo('vertical_loop', 233, 2104, '03 / Vertical loop', 'A full vertical position loop with continuous tracking'),
     Demo('lissajous', 267, 2121, '04 / Lissajous', 'Coupled oscillations, crossings and tight direction changes'),
     Demo('slalom', 162, 2046, '05 / Slalom', 'Repeated alternating turns with rapid acceleration'),
+    Demo('wave', 213, 2199, '06 / Climb and dive', 'Two steep waves with simultaneous lateral turns'),
 )
 NAMES = dict(figure8='三维 8 字', helix='螺旋爬升', vertical_loop='垂直回环',
-             lissajous='三维交叉曲线', slalom='连续蛇形')
+             lissajous='三维交叉曲线', slalom='连续蛇形', wave='连续爬升俯冲')
 
 
 def write_json(path, value):
@@ -99,13 +100,14 @@ def verify_video(path, trace, args):
 
 def build_gallery(output, manifest):
     cards = []
+    count = len(manifest['demos'])
     zero_residual = all(d['control_mode'] == 'geometric_feedforward_zero_residual' for d in manifest['demos'])
     controller = '几何前馈 + 零 RL 残差基线' if zero_residual else '几何前馈 + PPO 残差修正'
     control_note = f"控制方式：{controller}。检查点累计训练交互步数：{manifest['model_timesteps']}。"
-    lines = ['# 五条高难度轨迹飞行视频', '',
+    lines = [f'# {count} 条高难度轨迹飞行视频', '',
         '青色虚线：参考轨迹；橙色实线：真实仿真航迹。全部为独立测试集、完整难度、完整飞行。', '',
         control_note + ' 控制基线与学习残差的贡献需要分别报告。', '',
-        '本次选择 5 类有难度且通过严格标准的案例，再重新进行 PyBullet 物理仿真。'
+        f'本次选择 {count} 类有难度且通过严格标准的案例，再重新进行 PyBullet 物理仿真。'
         '成功要求完整飞完、位置 RMSE ≤ 0.10 m、最大位置误差 ≤ 0.30 m。'
         '选定案例不能代替整体成功率；既有 256 条测试中严格通过 227 条，完成 254 条。', '',
         '| 文件 | 测试轨迹 / 随机种子 | RMSE | 最大误差 | 参考峰值速度 | 实际时间倍率 |',
@@ -126,7 +128,7 @@ def build_gallery(output, manifest):
                      f"{100*demo['position_rmse_m']:.2f} cm | {100*demo['max_position_error_m']:.2f} cm | "
                      f"{demo['peak_reference_speed_m_s']:.2f} m/s | {demo['effective_speed_scale']:.3f}× |")
     page = '''<!doctype html><html lang="zh-CN"><head><meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1"><title>Flight / RL · 五条高难度飞行</title>
+<meta name="viewport" content="width=device-width,initial-scale=1"><title>Flight / RL · __DEMO_COUNT__ 条高难度飞行</title>
 <style>:root{color-scheme:dark;font-family:system-ui,sans-serif}*{box-sizing:border-box}
 body{margin:0;background:#09111e;color:#e9f1fc}main{max-width:1280px;margin:auto;padding:48px 28px}
 h1{font-size:clamp(30px,5vw,48px);margin:18px 0}p{color:#93a8c3;line-height:1.7}
@@ -139,17 +141,17 @@ video{display:block;width:100%;aspect-ratio:16/9;border:1px solid #26364d;border
 a{color:#8fdee8;font-size:14px;text-decoration:none}article p{font-size:14px;margin:10px 0}
 footer{margin-top:36px;padding-top:20px;border-top:1px solid #26364d;font-size:13px}
 @media(max-width:760px){main{padding:28px 16px}.grid{grid-template-columns:1fr}}</style></head>
-<body><main><header><div class="eyebrow">FLIGHT / RL · PYBULLET</div><h1>五条高难度轨迹，完整飞行实测</h1>
-<p>8 字交叉、螺旋爬升、垂直回环、三维交叉曲线和连续蛇形。固定全景镜头保留真实跟踪偏差，按真实时间播放。</p>
-<p>__CONTROL_NOTE__ 五条均通过完整飞行、RMSE ≤ 10 cm、最大误差 ≤ 30 cm 检查。</p></header>
+<body><main><header><div class="eyebrow">FLIGHT / RL · PYBULLET</div><h1>__DEMO_COUNT__ 条高难度轨迹，完整飞行实测</h1>
+<p>8 字交叉、螺旋爬升、垂直回环、三维交叉曲线、连续蛇形和连续爬升俯冲。固定全景镜头保留真实跟踪偏差，按真实时间播放。</p>
+<p>__CONTROL_NOTE__ 全部通过完整飞行、RMSE ≤ 10 cm、最大误差 ≤ 30 cm 检查。</p></header>
 <div class="legend"><span><i></i>参考轨迹</span><span><i class="actual"></i>实际航迹</span></div><section class="grid">'''
     page += ''.join(cards)
     page += '''</section><footer><p>选定的成功案例，不能代表所有轨迹均成功。既有 256 条测试中严格通过 227 条。
 请求时间倍率为 1.5×，实际倍率在各视频旁列出；部分急弯受到物理约束而自动限速。
 垂直回环指空间位置路径，不是机体倒飞翻转。每条保留约 0.5 秒开头和 1.5 秒结尾停留。</p></footer></main></body></html>'''
-    page = page.replace('__CONTROL_NOTE__', html.escape(control_note))
+    page = page.replace('__CONTROL_NOTE__', html.escape(control_note)).replace('__DEMO_COUNT__', str(count))
     (output/'index.html').write_text(page)
-    lines.extend(['', f"视频格式：{manifest['width']}×{manifest['height']}，{manifest['fps']} fps，H.264/yuv420p，无音轨，faststart。仅 5 个 MP4。", '',
+    lines.extend(['', f"视频格式：{manifest['width']}×{manifest['height']}，{manifest['fps']} fps，H.264/yuv420p，无音轨，faststart。共 {count} 个 MP4。", '',
         '打开 `index.html` 可逐条预览；文件名和标题相互对应。峰值速度为参考轨迹峰值，实测飞行速度另存于 metrics。', '',
         '请求时间倍率为 1.5×，相对于原始 10 秒参考轨迹。三维交叉曲线和蛇形受到急弯物理约束，自动回退并限速；实际倍率见表。'
         '所有视频按真实时间播放，不后期加速。空间回环不是机体倒飞翻转。', '',
@@ -158,14 +160,14 @@ footer{margin-top:36px;padding-top:20px;border-top:1px solid #26364d;font-size:1
         '50 Hz 物理状态转为 30 fps 时位置线性插值、姿态 SLERP；不吸附轨迹，不改写物理仿真。', '',
         '`manifest.json` 保存模型哈希、环境参数和每条测试结果；`verification.json` 保存数据校验、历史测试一致性和视频解码检查。', '',
         '复现（仓库根目录）：', '', '```bash', 'conda activate flight-rl',
-        'python -m FlightEnv.difficult_showcase --output exports/difficult_flights_5', '```', ''])
+        'python -m FlightEnv.difficult_showcase --output exports/difficult_flights_6', '```', ''])
     (output/'README.md').write_text('\n'.join(lines))
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--model', default='runs/residual_baseline/baseline.zip')
-    parser.add_argument('--output', default='exports/difficult_flights_5')
+    parser.add_argument('--output', default='exports/difficult_flights_6')
     parser.add_argument('--audit', help='Optional previous metrics.json for exact rollout comparison')
     parser.add_argument('--width', type=int, default=1280)
     parser.add_argument('--height', type=int, default=720)
@@ -197,7 +199,7 @@ def main():
         sha256=hashlib.sha256(model_path.read_bytes()).hexdigest(), model_timesteps=int(model.num_timesteps),
         renderer=f'PyBullet {args.renderer}', width=args.width, height=args.height, fps=args.fps,
         supersample=args.supersample, requested_speed_scale=1.5, requested_time_profile='cruise',
-        selection='Five diverse successful held-out cases; not aggregate benchmark performance.',
+        selection=f'{len(DEMOS)} diverse successful held-out cases; not aggregate benchmark performance.',
         timing='Real-time flight with 0.5-second introductory and 1.5-second final holds.',
         command=[sys.executable, '-m', 'FlightEnv.difficult_showcase', *sys.argv[1:]], demos=[])
     checks, flights = [], []
@@ -224,7 +226,7 @@ def main():
         assert {path.name for path in output.glob('*.mp4')} == allowed
         build_gallery(output, manifest)
         package_showcase(output)
-    print(f'Exported exactly {0 if args.preview else 5} MP4s to {output.resolve()}', flush=True)
+    print(f'Exported exactly {0 if args.preview else len(DEMOS)} MP4s to {output.resolve()}', flush=True)
 
 
 if __name__ == '__main__':

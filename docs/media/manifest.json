@@ -1,11 +1,11 @@
 {
-  "model_sha256": "6a3e618d6f9bf86af938169b88ef09ea7b9ff8d47b9a2639bb3687a5a3a37dc6",
+  "model_sha256": "286ebaaa748ba09fff18e8eb72e20620d52438960f1022f4209bfa96a5d9fb8f",
   "model_timesteps": 0,
   "source_renderer": "PyBullet egl",
-  "source_manifest_sha256": "9dba0a9b5eeb2a2e97415ee6bc80b7ab61369014fe05eaa60e116fe05bab706d",
+  "source_manifest_sha256": "d7065b1d50a1ae7281bd529aa9ae1fb978975a764df4a9f6870c33c1c07c665f",
   "requested_speed_scale": 1.5,
   "timing": "Complete flights at original playback speed; introductory/final holds preserved. Infinite loop.",
-  "selection": "Five selected successful held-out cases, not an aggregate success-rate claim.",
+  "selection": "6 selected successful held-out cases, not an aggregate success-rate claim.",
   "conversion": {
     "width": 640,
     "fps": 15,
@@ -177,6 +177,39 @@
       "bytes": 497403,
       "sha256": "992f6925e901f99b8730feae4497a163277db9c59b91c4cbb3d341c805b35318",
       "source_mp4_sha256": "9a5fcb3726c029cef22d10d44ebc714eb1ab04e367720de3d7a78f8e2041eddb"
+    },
+    {
+      "family": "wave",
+      "title": "06 / Climb and dive",
+      "subtitle": "Two steep waves with simultaneous lateral turns",
+      "trajectory_id": 213,
+      "seed": 2199,
+      "split": "test",
+      "difficulty": 1.0,
+      "completed": true,
+      "tracking_success": true,
+      "duration_seconds": 6.68,
+      "position_rmse_m": 0.02031695653757209,
+      "max_position_error_m": 0.07032561056830933,
+      "peak_reference_speed_m_s": 1.1229400471227393,
+      "mean_actual_speed_m_s": 0.8676954289343461,
+      "effective_speed_scale": 1.4970059880239521,
+      "effective_time_profile": "cruise",
+      "cruise_fallback": false,
+      "control_mode": "geometric_feedforward_zero_residual",
+      "acceptance": {
+        "rmse_m": 0.1,
+        "max_error_m": 0.3,
+        "must_complete": true
+      },
+      "file": "wave.gif",
+      "width": 640,
+      "height": 360,
+      "frames": 131,
+      "gif_duration_seconds": 8.74,
+      "bytes": 471239,
+      "sha256": "e6267c6696841704fd2fb9b4300d8130326543a8cba000469529c344f05d475b",
+      "source_mp4_sha256": "65ba81a3ff8d564b3ca78d7fc02e100399b1a6bcf54f90365b92230b6119cdfe"
     }
   ]
 }

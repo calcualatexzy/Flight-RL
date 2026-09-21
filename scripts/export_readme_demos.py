@@ -1,4 +1,4 @@
-"""Convert five measured-flight MP4s into portable, looping README GIF assets."""
+"""Convert the curated measured-flight MP4s into portable, looping README GIF assets."""
 import argparse
 import hashlib
 import json
@@ -8,7 +8,7 @@ import subprocess
 
 from PIL import Image
 
-FAMILIES = ('figure8', 'helix', 'vertical_loop', 'lissajous', 'slalom')
+FAMILIES = ('figure8', 'helix', 'vertical_loop', 'lissajous', 'slalom', 'wave')
 
 
 def sha256(path):
@@ -17,7 +17,7 @@ def sha256(path):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--input-dir', type=Path, default=Path('exports/difficult_flights_5'))
+    parser.add_argument('--input-dir', type=Path, default=Path('exports/difficult_flights_6'))
     parser.add_argument('--output', type=Path, default=Path('docs/media'))
     parser.add_argument('--width', type=int, default=640)
     parser.add_argument('--fps', type=int, default=15)
@@ -37,7 +37,7 @@ def main():
         source_renderer=source['renderer'], source_manifest_sha256=sha256(manifest_path),
         requested_speed_scale=source['requested_speed_scale'],
         timing='Complete flights at original playback speed; introductory/final holds preserved. Infinite loop.',
-        selection='Five selected successful held-out cases, not an aggregate success-rate claim.',
+        selection=f'{len(FAMILIES)} selected successful held-out cases, not an aggregate success-rate claim.',
         conversion=dict(width=args.width, fps=args.fps, palette_colors=160, dither='bayer'), demos=[])
     for family in FAMILIES:
         mp4 = args.input_dir/f'{family}.mp4'

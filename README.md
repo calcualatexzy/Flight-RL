@@ -3,15 +3,16 @@
 Quadrotor trajectory tracking with **PyBullet, Gymnasium, and PPO**. Generate diverse flight paths, train direct or residual policies, and compare reference paths with actual flights.
 
 <p align="center">
-  <img src="docs/media/figure8.gif" width="320" alt="Figure eight trajectory tracking">
-  <img src="docs/media/helix.gif" width="320" alt="Double spiral ascent tracking">
+  <img src="docs/media/figure8.gif" width="360" alt="Figure eight trajectory tracking">
+  <img src="docs/media/helix.gif" width="360" alt="Double spiral ascent tracking">
 </p>
 <p align="center">
-  <img src="docs/media/vertical_loop.gif" width="320" alt="Vertical position loop tracking">
-  <img src="docs/media/lissajous.gif" width="320" alt="Three-dimensional Lissajous tracking">
+  <img src="docs/media/vertical_loop.gif" width="360" alt="Vertical position loop tracking">
+  <img src="docs/media/lissajous.gif" width="360" alt="Three-dimensional Lissajous tracking">
 </p>
 <p align="center">
-  <img src="docs/media/slalom.gif" width="320" alt="Slalom trajectory tracking">
+  <img src="docs/media/slalom.gif" width="360" alt="Slalom trajectory tracking">
+  <img src="docs/media/wave.gif" width="360" alt="Wave tracking with repeated climbs and dives">
 </p>
 
 **Cyan:** reference path. **Orange:** actual flight. These selected test flights use the **geometric controller with zero RL residual**; residual PPO training has not improved this baseline. Full flights play at their original speed. [Demo metrics and seeds](docs/media/manifest.json).
@@ -68,14 +69,14 @@ The zero-residual baseline completes **254/256** held-out flights; **227/256** m
 
 ## Export demos
 
-Requires FFmpeg, DejaVu Sans fonts, and EGL for GPU rendering. The default dataset and baseline above reproduce the five demo paths.
+Requires FFmpeg, DejaVu Sans fonts, and EGL for GPU rendering. The default dataset and baseline above reproduce the six demo paths.
 
 ```bash
-python -m FlightEnv.difficult_showcase --output exports/difficult_flights_5
-python scripts/export_readme_demos.py --input-dir exports/difficult_flights_5
+python -m FlightEnv.difficult_showcase --output exports/difficult_flights_6
+python scripts/export_readme_demos.py --input-dir exports/difficult_flights_6
 ```
 
-Exports include five MP4s, a preview page, flight traces, metrics, and a ZIP. The second command creates the looping README GIFs. [Rendering options](docs/guide.md#visualization-and-export).
+Exports include six MP4s, a preview page, flight traces, metrics, and a ZIP. The second command creates the looping README GIFs. [Rendering options](docs/guide.md#visualization-and-export).
 
 ## Documentation and tests
 

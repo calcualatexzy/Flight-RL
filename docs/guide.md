@@ -51,7 +51,7 @@ Each dataset includes:
 - `manifest.json`: generation parameters and per-path metadata.
 - `trajectory_gallery.png`: examples from each family.
 
-Pass the same `--dataset-dir` to initialization, training, and evaluation when using a custom dataset. Generated datasets stay outside Git. The five curated demos require the default seed and 32 test paths per family so that their trajectory IDs match.
+Pass the same `--dataset-dir` to initialization, training, and evaluation when using a custom dataset. Generated datasets stay outside Git. The six curated demos require the default seed and 32 test paths per family so that their trajectory IDs match.
 
 ### Difficulty and timing
 
@@ -207,18 +207,18 @@ Software rendering can be slow. Servers without a display can evaluate headlessl
 
 ```bash
 python -m FlightEnv.difficult_showcase \
-  --model runs/residual_baseline/baseline.zip --output exports/difficult_flights_5
+  --model runs/residual_baseline/baseline.zip --output exports/difficult_flights_6
 python scripts/export_readme_demos.py \
-  --input-dir exports/difficult_flights_5 --output docs/media
+  --input-dir exports/difficult_flights_6 --output docs/media
 ```
 
 The exporter runs actual physics, requires strict tracking success, then replays recorded positions and orientations in a separate PyBullet scene. It uses the original drone scale, linear position interpolation, and quaternion SLERP. It does not snap flights to the reference, alter physics states, or remove failed segments. A failing rollout raises an error.
 
-- Default output: five 1280x720, 30 fps H.264 MP4s with faststart, a 0.5-second opening hold, and a 1.5-second final hold.
+- Default output: six 1280x720, 30 fps H.264 MP4s with faststart, a 0.5-second opening hold, and a 1.5-second final hold.
 - EGL uses 2x supersampling; `--renderer tiny` is a slower CPU fallback for the detailed original model.
 - `--preview` generates posters and metrics only. `--audit <metrics.json>` compares matching trajectory IDs/seeds against earlier recorded rollouts.
 - The output includes a local `index.html`, posters, `*_rollout.npz`, metrics, a manifest, verification results, and a ZIP in the parent directory.
-- README GIF files remain 640x360 at 15 fps, with infinite looping. The README displays them at 320 pixels wide in a wrapping layout. The [media manifest](media/manifest.json) records source-video and GIF hashes.
+- README GIF files remain 640x360 at 15 fps, with infinite looping. The README displays them at 360 pixels wide in a wrapping layout. The [media manifest](media/manifest.json) records source-video and GIF hashes.
 
 Training artifacts and full exports stay in ignored `runs/` and `exports/`; selected GIFs and published metrics are versioned. The historical pure-PPO exporter remains available as `python -m FlightEnv.showcase --model <tracking-checkpoint.zip>` and uses the older, looser success thresholds.
 
@@ -231,7 +231,7 @@ python -m compileall -q main.py FlightEnv scripts tests
 git diff --check
 ```
 
-The 67 tests cover applied actions, Gymnasium semantics, seeding, client isolation, trajectory derivatives/splits, mixing, rewards, retiming, residual equivalence, curricula, stopping, and checkpoint round trips. Tests create temporary datasets. [Release verification](benchmarks/release_verification.json) also records clean-source generation, initialization, training/resume, and reproduction of all five demos.
+The 67 tests cover applied actions, Gymnasium semantics, seeding, client isolation, trajectory derivatives/splits, mixing, rewards, retiming, residual equivalence, curricula, stopping, and checkpoint round trips. Tests create temporary datasets. [Release verification](benchmarks/release_verification.json) also records clean-source generation, initialization, training/resume, and reproduction of the original five demos.
 
 Current model format 4 supports tracking and residual tasks; formats 2/3 remain loadable. Original unversioned checkpoints in the root and `results/Jack/` use incompatible physical-thrust semantics. They are retained as historical artifacts; create a new model for the current tasks. The bundled ZIP trajectory library remains available to the legacy profile and compatibility tests.
 
